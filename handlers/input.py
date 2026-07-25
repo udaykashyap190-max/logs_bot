@@ -1,13 +1,16 @@
-import subprocess
-import re
+# =========================================================
+# FILE: handlers/input.py
+# PART 9E
+# Interactive Input Handler
+# =========================================================
 
 from telegram import Update
+from telegram.ext import ContextTypes
 
-from telegram.ext import (
-    ContextTypes
+from core.auth import (
+    has_access,
+    is_admin
 )
-
-from core.auth import has_access
 
 from core.process import (
     send_input,
@@ -15,9 +18,9 @@ from core.process import (
 )
 
 
-# =========================
-# HANDLE TEXT INPUT
-# =========================
+# =========================================================
+# HANDLE USER INPUT
+# =========================================================
 
 async def handle_input(
     update: Update,
@@ -26,234 +29,107 @@ async def handle_input(
 
     user = update.effective_user
 
-    message = update.message
-
-
-    if user is None or message is None:
-
+    if user is None:
         return
 
 
-    # =========================
-    # ACCESS CHECK
-    # =========================
+    message = update.message
 
-    if not has_access(user.id):
-
+    if message is None:
         return
 
 
     text = message.text
 
-
     if not text:
-
         return
 
 
-    # =========================
-    # MODULE INSTALL MODE
-    # =========================
-
-    module_file = context.user_data.get(
-
-        "module_install_file"
-
-    )
+    user_id = user.id
 
 
-    if module_file:
+    # =====================================================
+    # ACCESS CHECK
+    # =====================================================
 
-        # Only allow normal Python package names.
-        # This prevents arbitrary shell commands.
+    if not is_admin(user_id):
 
-        if not re.fullmatch(
-
-            r"[A-Za-z0-9_.-]+",
-
-            text.strip()
-
-        ):
-
-            await message.reply_text(
-
-                "❌ Invalid package name.\n\n"
-
-                "Please send a valid Python "
-                "package name, for example:\n"
-
-                "`requests`",
-
-                parse_mode="Markdown"
-
-            )
+        if not has_access(user_id):
 
             return
 
 
-        package = text.strip()
-
-
-        await message.reply_text(
-
-            f"📦 Installing `{package}`...\n\n"
-            f"Please wait.",
-
-            parse_mode="Markdown"
-
-        )
-
-
-        try:
-
-            result = subprocess.run(
-
-                [
-
-                    "python",
-
-                    "-m",
-
-                    "pip",
-
-                    "install",
-
-                    package
-
-                ],
-
-                capture_output=True,
-
-                text=True,
-
-                timeout=120
-
-            )
-
-
-            if result.returncode == 0:
-
-                output = result.stdout
-
-                if len(output) > 2500:
-
-                    output = output[-2500:]
-
-
-                await message.reply_text(
-
-                    f"✅ Module installed successfully!\n\n"
-
-                    f"📦 Package: `{package}`\n\n"
-
-                    f"```text\n"
-                    f"{output}\n"
-                    f"```",
-
-                    parse_mode="Markdown"
-
-                )
-
-
-            else:
-
-                error = result.stderr
-
-                if len(error) > 3000:
-
-                    error = error[-3000:]
-
-
-                await message.reply_text(
-
-                    f"❌ Failed to install `{package}`.\n\n"
-
-                    f"```text\n"
-                    f"{error}\n"
-                    f"```",
-
-                    parse_mode="Markdown"
-
-                )
-
-
-        except subprocess.TimeoutExpired:
-
-            await message.reply_text(
-
-                "⏱️ Installation timed out.\n\n"
-                "The package may be too large "
-                "or unavailable."
-
-            )
-
-
-        except Exception as e:
-
-            await message.reply_text(
-
-                f"❌ Installation error:\n\n"
-                f"{e}"
-
-            )
-
-
-        # Clear install mode
-
-        context.user_data.pop(
-
-            "module_install_file",
-
-            None
-
-        )
-
-
-        return
-
-
-    # =========================
-    # NORMAL PROCESS INPUT
-    # =========================
+    # =====================================================
+    # GET SELECTED FILE
+    # =====================================================
 
     filename = context.user_data.get(
-
         "active_file"
-
     )
 
+
+    # =====================================================
+    # NO FILE SELECTED
+    # =====================================================
 
     if not filename:
 
         await message.reply_text(
 
-            "ℹ️ No file is selected "
-            "for input.\n\n"
+            "ℹ️ <b>No file selected for input.</b>\n\n"
 
-            "Click ⌨️ Send Input on "
-            "the file you want to control."
+            "Open your uploaded files and press "
+            "⌨️ <b>Send Input</b> on the file that "
+            "is asking for information.\n\n"
+
+            "For example:\n"
+            "• API Key\n"
+            "• Chat ID\n"
+            "• Username\n"
+            "• Password\n"
+            "• Any other input",
+
+            parse_mode="HTML"
 
         )
 
         return
 
 
-    if not is_running(filename):
+    # =====================================================
+    # CHECK PROCESS
+    # =====================================================
+
+    if not is_running(
+        filename
+    ):
+
+        # Clear invalid active file
+
+        context.user_data.pop(
+            "active_file",
+            None
+        )
+
 
         await message.reply_text(
 
-            f"❌ `{filename}` is not running.",
+            f"❌ <b>{filename}</b> "
+            "is no longer running.\n\n"
 
-            parse_mode="Markdown"
+            "Please start the file again "
+            "and select ⌨️ <b>Send Input</b>.",
+
+            parse_mode="HTML"
 
         )
 
         return
 
 
-    # =========================
+    # =====================================================
     # SEND INPUT
-    # =========================
+    # =====================================================
 
     success, result = send_input(
 
@@ -264,20 +140,43 @@ async def handle_input(
     )
 
 
+    # =====================================================
+    # SUCCESS
+    # =====================================================
+
     if success:
 
         await message.reply_text(
 
-            f"✅ Input sent to `{filename}`.",
+            "✅ <b>Input Sent</b>\n\n"
 
-            parse_mode="Markdown"
+            f"📄 File: "
+            f"<code>{filename}</code>\n"
 
-        )
+            f"📤 Input: "
+            f"<code>{text}</code>",
 
-    else:
-
-        await message.reply_text(
-
-            result
+            parse_mode="HTML"
 
         )
+
+
+        # Keep active_file selected.
+        # This allows the user to answer
+        # multiple questions from the same file.
+
+        return
+
+
+    # =====================================================
+    # FAILED
+    # =====================================================
+
+    await message.reply_text(
+
+        f"❌ <b>Input Failed</b>\n\n"
+        f"{result}",
+
+        parse_mode="HTML"
+
+    )
