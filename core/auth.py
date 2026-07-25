@@ -1,61 +1,87 @@
-from config import OWNER_ID
+from config import ADMIN_IDS
 
 from database import (
-    add_user,
+    save_user,
     get_user_status,
-    is_approved,
+    set_user_status
 )
-
-
-def is_owner(user_id):
-    """
-    Backward-compatible function.
-    Returns True if the user is the bot owner/admin.
-    """
-    return user_id == OWNER_ID
 
 
 def is_admin(user_id):
     """
-    Returns True if the user is the bot admin.
+    Check if a Telegram user is an administrator.
     """
-    return user_id == OWNER_ID
+
+    try:
+        return int(user_id) in ADMIN_IDS
+
+    except (TypeError, ValueError):
+
+        return False
 
 
 def register_user(user):
     """
-    Add the user to the database
-    if they don't already exist.
+    Register or update a Telegram user.
     """
 
-    add_user(
+    if not user:
+        return
+
+    save_user(
         user_id=user.id,
-        username=user.username or "",
-        first_name=user.first_name or "",
+        username=user.username,
+        first_name=user.first_name
     )
 
 
 def get_status(user_id):
     """
-    Get user's current access status.
+    Return the user's current status.
     """
 
-    if is_admin(user_id):
-        return "admin"
-
-    return get_user_status(user_id)
+    return get_user_status(
+        user_id
+    )
 
 
 def has_access(user_id):
     """
-    Check whether the user is allowed
-    to use the bot.
+    Admins always have access.
+
+    Normal users need approved status.
     """
 
     if is_admin(user_id):
+
         return True
 
-    return is_approved(
+    status = get_user_status(
+        user_id
+    )
+
+    return status == "approved"
+
+
+def approve_user(user_id):
+
+    set_user_status(
         user_id,
-        OWNER_ID,
+        "approved"
+    )
+
+
+def reject_user(user_id):
+
+    set_user_status(
+        user_id,
+        "rejected"
+    )
+
+
+def block_user(user_id):
+
+    set_user_status(
+        user_id,
+        "blocked"
     )
