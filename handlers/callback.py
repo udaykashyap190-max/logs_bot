@@ -1,9 +1,22 @@
+# =========================================================
+# FILE: handlers/callback.py
+# PART 9C-3
+# =========================================================
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from core.auth import (
-    is_admin,
-    has_access
+    has_access,
+    is_admin
+)
+
+from core.process import (
+    start_process,
+    stop_process,
+    restart_process,
+    get_logs,
+    clear_logs
 )
 
 # =========================================================
@@ -25,25 +38,7 @@ from handlers.admin import (
 
 
 # =========================================================
-# EXISTING USER HANDLERS
-# =========================================================
-
-# IMPORTANT:
-# These imports must match the actual function names
-# in your existing project.
-
-from core.process import (
-    start_process,
-    stop_process,
-    restart_process,
-    get_logs,
-    clear_logs,
-    send_input
-)
-
-
-# =========================================================
-# CALLBACK ROUTER
+# MAIN CALLBACK HANDLER
 # =========================================================
 
 async def handle_callback(
@@ -54,34 +49,29 @@ async def handle_callback(
     query = update.callback_query
 
     if not query:
-
         return
 
-
+    # Answer callback first
     await query.answer()
 
+    user = query.from_user
 
-    user_id = (
-        query.from_user.id
-    )
+    user_id = user.id
 
-    data = (
-        query.data
-        or ""
-    )
+    data = query.data or ""
 
 
     # =====================================================
     # ADMIN ROUTES
     # =====================================================
 
-    # Admin Panel
+    # -----------------------------------------------------
+    # ADMIN PANEL
+    # -----------------------------------------------------
 
     if data == "admin_panel":
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -89,7 +79,6 @@ async def handle_callback(
             )
 
             return
-
 
         await admin_panel(
             update,
@@ -99,13 +88,13 @@ async def handle_callback(
         return
 
 
-    # Pending Requests
+    # -----------------------------------------------------
+    # PENDING REQUESTS
+    # -----------------------------------------------------
 
     if data == "admin_pending":
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -113,7 +102,6 @@ async def handle_callback(
             )
 
             return
-
 
         await show_pending(
             update,
@@ -123,13 +111,13 @@ async def handle_callback(
         return
 
 
-    # Approved Users
+    # -----------------------------------------------------
+    # APPROVED USERS
+    # -----------------------------------------------------
 
     if data == "admin_approved":
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -137,7 +125,6 @@ async def handle_callback(
             )
 
             return
-
 
         await show_approved(
             update,
@@ -147,13 +134,13 @@ async def handle_callback(
         return
 
 
-    # Blocked Users
+    # -----------------------------------------------------
+    # BLOCKED USERS
+    # -----------------------------------------------------
 
     if data == "admin_blocked":
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -161,7 +148,6 @@ async def handle_callback(
             )
 
             return
-
 
         await show_blocked(
             update,
@@ -171,13 +157,13 @@ async def handle_callback(
         return
 
 
-    # Statistics
+    # -----------------------------------------------------
+    # ADMIN STATISTICS
+    # -----------------------------------------------------
 
     if data == "admin_stats":
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -185,7 +171,6 @@ async def handle_callback(
             )
 
             return
-
 
         await show_stats(
             update,
@@ -195,15 +180,15 @@ async def handle_callback(
         return
 
 
-    # User Management
+    # -----------------------------------------------------
+    # VIEW SPECIFIC USER
+    # -----------------------------------------------------
 
     if data.startswith(
         "admin_user|"
     ):
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -211,7 +196,6 @@ async def handle_callback(
             )
 
             return
-
 
         await show_user(
             update,
@@ -221,15 +205,15 @@ async def handle_callback(
         return
 
 
-    # Approve User
+    # -----------------------------------------------------
+    # APPROVE USER
+    # -----------------------------------------------------
 
     if data.startswith(
         "approve|"
     ):
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -237,7 +221,6 @@ async def handle_callback(
             )
 
             return
-
 
         await approve_user_callback(
             update,
@@ -247,15 +230,15 @@ async def handle_callback(
         return
 
 
-    # Reject User
+    # -----------------------------------------------------
+    # REJECT USER
+    # -----------------------------------------------------
 
     if data.startswith(
         "reject|"
     ):
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -263,7 +246,6 @@ async def handle_callback(
             )
 
             return
-
 
         await reject_user_callback(
             update,
@@ -273,15 +255,15 @@ async def handle_callback(
         return
 
 
-    # Block User
+    # -----------------------------------------------------
+    # BLOCK USER
+    # -----------------------------------------------------
 
     if data.startswith(
         "block|"
     ):
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -289,7 +271,6 @@ async def handle_callback(
             )
 
             return
-
 
         await block_user_callback(
             update,
@@ -299,15 +280,15 @@ async def handle_callback(
         return
 
 
-    # Delete User
+    # -----------------------------------------------------
+    # DELETE USER
+    # -----------------------------------------------------
 
     if data.startswith(
         "delete_user|"
     ):
 
-        if not is_admin(
-            user_id
-        ):
+        if not is_admin(user_id):
 
             await query.answer(
                 "🚫 Admin access required.",
@@ -315,7 +296,6 @@ async def handle_callback(
             )
 
             return
-
 
         await delete_user_callback(
             update,
@@ -326,25 +306,24 @@ async def handle_callback(
 
 
     # =====================================================
-    # USER ACCESS CHECK
+    # NORMAL USER ACCESS CHECK
     # =====================================================
 
-    # Admins bypass normal user access checks.
+    # Admins automatically bypass normal user access.
 
-    if not is_admin(
-        user_id
-    ):
+    if not is_admin(user_id):
 
-        if not has_access(
-            user_id
-        ):
+        if not has_access(user_id):
 
             await query.edit_message_text(
 
                 "🚫 <b>ACCESS DENIED</b>\n\n"
 
                 "Your account is not approved "
-                "to use this bot yet.",
+                "to use this bot yet.\n\n"
+
+                "Please wait for the administrator "
+                "to approve your request.",
 
                 parse_mode="HTML"
 
@@ -359,14 +338,28 @@ async def handle_callback(
 
     if data == "home":
 
-        from handlers.start import (
-            show_home
-        )
+        try:
 
-        await show_home(
-            update,
-            context
-        )
+            from handlers.start import (
+                show_home
+            )
+
+            await show_home(
+                update,
+                context
+            )
+
+        except ImportError:
+
+            await query.edit_message_text(
+
+                "🏠 <b>HOME</b>\n\n"
+
+                "Welcome back!",
+
+                parse_mode="HTML"
+
+            )
 
         return
 
@@ -387,18 +380,24 @@ async def handle_callback(
 
         try:
 
-            result = await start_process(
-
-                user_id,
-
+            result = start_process(
                 filename
-
             )
+
+
+            # If the process function
+            # doesn't return anything
+
+            if result is None:
+
+                result = (
+                    "Process started successfully."
+                )
 
 
             await query.edit_message_text(
 
-                f"▶️ <b>PROCESS STARTED</b>\n\n"
+                "▶️ <b>PROCESS STARTED</b>\n\n"
 
                 f"📄 File: "
                 f"<code>{filename}</code>\n\n"
@@ -409,13 +408,18 @@ async def handle_callback(
 
             )
 
+
         except Exception as e:
 
             await query.edit_message_text(
 
                 "❌ <b>START FAILED</b>\n\n"
 
-                f"<code>{e}</code>",
+                f"📄 File: "
+                f"<code>{filename}</code>\n\n"
+
+                f"Error:\n"
+                f"<code>{str(e)}</code>",
 
                 parse_mode="HTML"
 
@@ -441,18 +445,21 @@ async def handle_callback(
 
         try:
 
-            result = await stop_process(
-
-                user_id,
-
+            result = stop_process(
                 filename
-
             )
+
+
+            if result is None:
+
+                result = (
+                    "Process stopped successfully."
+                )
 
 
             await query.edit_message_text(
 
-                f"⏹️ <b>PROCESS STOPPED</b>\n\n"
+                "⏹️ <b>PROCESS STOPPED</b>\n\n"
 
                 f"📄 File: "
                 f"<code>{filename}</code>\n\n"
@@ -463,13 +470,18 @@ async def handle_callback(
 
             )
 
+
         except Exception as e:
 
             await query.edit_message_text(
 
                 "❌ <b>STOP FAILED</b>\n\n"
 
-                f"<code>{e}</code>",
+                f"📄 File: "
+                f"<code>{filename}</code>\n\n"
+
+                f"Error:\n"
+                f"<code>{str(e)}</code>",
 
                 parse_mode="HTML"
 
@@ -495,18 +507,21 @@ async def handle_callback(
 
         try:
 
-            result = await restart_process(
-
-                user_id,
-
+            result = restart_process(
                 filename
-
             )
+
+
+            if result is None:
+
+                result = (
+                    "Process restarted successfully."
+                )
 
 
             await query.edit_message_text(
 
-                f"🔄 <b>PROCESS RESTARTED</b>\n\n"
+                "🔄 <b>PROCESS RESTARTED</b>\n\n"
 
                 f"📄 File: "
                 f"<code>{filename}</code>\n\n"
@@ -517,13 +532,18 @@ async def handle_callback(
 
             )
 
+
         except Exception as e:
 
             await query.edit_message_text(
 
                 "❌ <b>RESTART FAILED</b>\n\n"
 
-                f"<code>{e}</code>",
+                f"📄 File: "
+                f"<code>{filename}</code>\n\n"
+
+                f"Error:\n"
+                f"<code>{str(e)}</code>",
 
                 parse_mode="HTML"
 
@@ -550,11 +570,7 @@ async def handle_callback(
         try:
 
             logs = get_logs(
-
-                user_id,
-
                 filename
-
             )
 
 
@@ -565,13 +581,32 @@ async def handle_callback(
                 )
 
 
-            # Telegram message limit protection
+            # Telegram message size protection
 
             if len(logs) > 3800:
 
-                logs = logs[
-                    -3800:
-                ]
+                logs = (
+                    logs[-3800:]
+                )
+
+
+            # Escape basic HTML characters
+
+            logs = (
+                logs
+                .replace(
+                    "&",
+                    "&amp;"
+                )
+                .replace(
+                    "<",
+                    "&lt;"
+                )
+                .replace(
+                    ">",
+                    "&gt;"
+                )
+            )
 
 
             await query.edit_message_text(
@@ -587,13 +622,14 @@ async def handle_callback(
 
             )
 
+
         except Exception as e:
 
             await query.edit_message_text(
 
                 "❌ <b>LOG ERROR</b>\n\n"
 
-                f"<code>{e}</code>",
+                f"<code>{str(e)}</code>",
 
                 parse_mode="HTML"
 
@@ -620,27 +656,24 @@ async def handle_callback(
         try:
 
             clear_logs(
-
-                user_id,
-
                 filename
-
             )
 
 
             await query.answer(
 
-                "🧹 Logs cleared.",
+                "🧹 Logs cleared successfully.",
 
                 show_alert=True
 
             )
 
+
         except Exception as e:
 
             await query.answer(
 
-                f"❌ Error: {e}",
+                f"❌ Error: {str(e)}",
 
                 show_alert=True
 
