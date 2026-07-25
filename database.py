@@ -15,7 +15,6 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Users table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -27,7 +26,6 @@ def init_db():
         )
     """)
 
-    # Uploaded files table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS user_files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,8 +53,7 @@ def save_user(
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT INTO users
-        (
+        INSERT INTO users (
             user_id,
             username,
             first_name
@@ -79,6 +76,7 @@ def save_user(
 
 
 def get_user(user_id):
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -86,7 +84,9 @@ def get_user(user_id):
         SELECT *
         FROM users
         WHERE user_id = ?
-    """, (user_id,))
+    """, (
+        user_id,
+    ))
 
     user = cursor.fetchone()
 
@@ -96,6 +96,7 @@ def get_user(user_id):
 
 
 def get_user_status(user_id):
+
     user = get_user(user_id)
 
     if not user:
@@ -108,6 +109,7 @@ def set_user_status(
     user_id,
     status
 ):
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -133,14 +135,12 @@ def add_file_owner(
     user_id,
     filename
 ):
-    init_db()
 
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT OR IGNORE INTO user_files
-        (
+        INSERT OR IGNORE INTO user_files (
             user_id,
             filename
         )
@@ -155,7 +155,6 @@ def add_file_owner(
 
 
 def get_user_files(user_id):
-    init_db()
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -183,7 +182,6 @@ def user_owns_file(
     user_id,
     filename
 ):
-    init_db()
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -210,7 +208,6 @@ def remove_user_file(
     user_id,
     filename
 ):
-    init_db()
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -237,6 +234,7 @@ def remove_user_file(
 # =========================================================
 
 def get_user_file_count(user_id):
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -256,13 +254,13 @@ def get_user_file_count(user_id):
 
 
 def get_total_users():
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM users
-    """)
+    cursor.execute(
+        "SELECT COUNT(*) FROM users"
+    )
 
     count = cursor.fetchone()[0]
 
@@ -272,6 +270,7 @@ def get_total_users():
 
 
 def get_approved_users():
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -289,6 +288,7 @@ def get_approved_users():
 
 
 def get_pending_users():
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -306,13 +306,13 @@ def get_pending_users():
 
 
 def get_total_files():
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT COUNT(*)
-        FROM user_files
-    """)
+    cursor.execute(
+        "SELECT COUNT(*) FROM user_files"
+    )
 
     count = cursor.fetchone()[0]
 
@@ -321,5 +321,4 @@ def get_total_files():
     return count
 
 
-# Initialize database when imported
 init_db()
