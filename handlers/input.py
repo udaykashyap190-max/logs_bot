@@ -1,7 +1,7 @@
 # =========================================================
 # FILE: handlers/input.py
-# PART 9E
-# Interactive Input Handler
+# PART 9F
+# User-Specific Input Handler
 # =========================================================
 
 from telegram import Update
@@ -19,29 +19,29 @@ from core.process import (
 
 
 # =========================================================
-# HANDLE USER INPUT
+# HANDLE INPUT
 # =========================================================
 
 async def handle_input(
+
     update: Update,
+
     context: ContextTypes.DEFAULT_TYPE
+
 ):
 
     user = update.effective_user
 
-    if user is None:
-        return
-
-
     message = update.message
 
-    if message is None:
+
+    if not user or not message:
+
         return
 
 
-    text = message.text
+    if not message.text:
 
-    if not text:
         return
 
 
@@ -49,45 +49,39 @@ async def handle_input(
 
 
     # =====================================================
-    # ACCESS CHECK
+    # ACCESS
     # =====================================================
 
-    if not is_admin(user_id):
+    if not is_admin(
+        user_id
+    ):
 
-        if not has_access(user_id):
+        if not has_access(
+            user_id
+        ):
 
             return
 
 
     # =====================================================
-    # GET SELECTED FILE
+    # ACTIVE FILE
     # =====================================================
 
     filename = context.user_data.get(
+
         "active_file"
+
     )
 
-
-    # =====================================================
-    # NO FILE SELECTED
-    # =====================================================
 
     if not filename:
 
         await message.reply_text(
 
-            "ℹ️ <b>No file selected for input.</b>\n\n"
+            "⌨️ <b>No file selected</b>\n\n"
 
-            "Open your uploaded files and press "
-            "⌨️ <b>Send Input</b> on the file that "
-            "is asking for information.\n\n"
-
-            "For example:\n"
-            "• API Key\n"
-            "• Chat ID\n"
-            "• Username\n"
-            "• Password\n"
-            "• Any other input",
+            "Open <b>My Files</b> and select "
+            "the file that is waiting for input.",
 
             parse_mode="HTML"
 
@@ -97,28 +91,32 @@ async def handle_input(
 
 
     # =====================================================
-    # CHECK PROCESS
+    # RUNNING CHECK
     # =====================================================
 
     if not is_running(
+
+        user_id,
+
         filename
+
     ):
 
-        # Clear invalid active file
-
         context.user_data.pop(
+
             "active_file",
+
             None
+
         )
 
 
         await message.reply_text(
 
-            f"❌ <b>{filename}</b> "
-            "is no longer running.\n\n"
+            "❌ <b>Process is not running.</b>\n\n"
 
-            "Please start the file again "
-            "and select ⌨️ <b>Send Input</b>.",
+            f"📄 File: "
+            f"<code>{filename}</code>",
 
             parse_mode="HTML"
 
@@ -133,16 +131,14 @@ async def handle_input(
 
     success, result = send_input(
 
+        user_id,
+
         filename,
 
-        text
+        message.text
 
     )
 
-
-    # =====================================================
-    # SUCCESS
-    # =====================================================
 
     if success:
 
@@ -154,27 +150,19 @@ async def handle_input(
             f"<code>{filename}</code>\n"
 
             f"📤 Input: "
-            f"<code>{text}</code>",
+            f"<code>{message.text}</code>",
 
             parse_mode="HTML"
 
         )
 
-
-        # Keep active_file selected.
-        # This allows the user to answer
-        # multiple questions from the same file.
-
         return
 
-
-    # =====================================================
-    # FAILED
-    # =====================================================
 
     await message.reply_text(
 
         f"❌ <b>Input Failed</b>\n\n"
+
         f"{result}",
 
         parse_mode="HTML"
