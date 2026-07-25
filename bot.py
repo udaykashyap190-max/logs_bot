@@ -1,160 +1,155 @@
 import asyncio
+import logging
 
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
-    MessageHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    ContextTypes,
     filters,
 )
 
 from config import BOT_TOKEN
 
-from database import init_database
+from database import init_db
 
 from handlers.start import start
 from handlers.upload import upload_file
 from handlers.callback import handle_callback
-from handlers.input import handle_input
 
-from handlers.admin import (
-    admin_panel,
-    show_pending,
-    show_approved,
-    show_blocked,
-    approve_user,
-    reject_user,
+
+# =========================================================
+# LOGGING
+# =========================================================
+
+logging.basicConfig(
+    format=(
+        "%(asctime)s - "
+        "%(name)s - "
+        "%(levelname)s - "
+        "%(message)s"
+    ),
+    level=logging.INFO,
 )
 
-
-# =========================
-# INITIALIZE DATABASE
-# =========================
-
-init_database()
+logger = logging.getLogger(__name__)
 
 
-# =========================
-# CREATE BOT APPLICATION
-# =========================
+# =========================================================
+# ERROR HANDLER
+# =========================================================
 
-app = (
-    Application
-    .builder()
-    .token(BOT_TOKEN)
-    .build()
-)
+async def error_handler(
+    update: object,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-
-# =========================
-# START COMMAND
-# =========================
-
-app.add_handler(
-    CommandHandler(
-        "start",
-        start
+    logger.error(
+        "Exception while handling update:",
+        exc_info=context.error
     )
-)
 
 
-# =========================
-# ADMIN PANEL CALLBACKS
-# =========================
-
-app.add_handler(
-    CallbackQueryHandler(
-        admin_panel,
-        pattern=r"^admin_panel$"
-    )
-)
-
-
-app.add_handler(
-    CallbackQueryHandler(
-        show_pending,
-        pattern=r"^admin_pending$"
-    )
-)
-
-
-app.add_handler(
-    CallbackQueryHandler(
-        show_approved,
-        pattern=r"^admin_approved$"
-    )
-)
-
-
-app.add_handler(
-    CallbackQueryHandler(
-        show_blocked,
-        pattern=r"^admin_blocked$"
-    )
-)
-
-
-app.add_handler(
-    CallbackQueryHandler(
-        approve_user,
-        pattern=r"^approve\|"
-    )
-)
-
-
-app.add_handler(
-    CallbackQueryHandler(
-        reject_user,
-        pattern=r"^reject\|"
-    )
-)
-
-
-# =========================
-# GENERAL FILE BUTTONS
-# =========================
-
-app.add_handler(
-    CallbackQueryHandler(
-        handle_callback
-    )
-)
-
-
-# =========================
-# FILE UPLOAD
-# =========================
-
-app.add_handler(
-    MessageHandler(
-        filters.Document.ALL,
-        upload_file
-    )
-)
-
-
-# =========================
-# TEXT INPUT
-# =========================
-
-app.add_handler(
-    MessageHandler(
-        filters.TEXT
-        & ~filters.COMMAND,
-        handle_input
-    )
-)
-
-
-# =========================
+# =========================================================
 # MAIN
-# =========================
+# =========================================================
 
 async def main():
+
+    # -----------------------------------------------------
+    # Initialize database
+    # -----------------------------------------------------
+
+    init_db()
+
+    # -----------------------------------------------------
+    # Create Telegram application
+    # -----------------------------------------------------
+
+    app = (
+        Application
+        .builder()
+        .token(BOT_TOKEN)
+        .build()
+    )
+
+    # -----------------------------------------------------
+    # COMMANDS
+    # -----------------------------------------------------
+
+    app.add_handler(
+        CommandHandler(
+            "start",
+            start
+        )
+    )
+
+    # -----------------------------------------------------
+    # CALLBACK BUTTONS
+    # -----------------------------------------------------
+
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_callback
+        )
+    )
+
+    # -----------------------------------------------------
+    # FILE UPLOADS
+    # -----------------------------------------------------
+
+    app.add_handler(
+        MessageHandler(
+            filters.Document.ALL,
+            upload_file
+        )
+    )
+
+    # -----------------------------------------------------
+    # ERROR HANDLER
+    # -----------------------------------------------------
+
+    app.add_error_handler(
+        error_handler
+    )
+
+    # -----------------------------------------------------
+    # START BOT
+    # -----------------------------------------------------
+
+    print(
+        "===================================="
+    )
+
+    print(
+        "🤖 FILE RUNNER BOT"
+    )
+
+    print(
+        "===================================="
+    )
+
+    print(
+        "✅ Database Initialized"
+    )
+
+    print(
+        "✅ Handlers Loaded"
+    )
 
     print(
         "✅ Bot Started Successfully"
     )
+
+    print(
+        "===================================="
+    )
+
+    # -----------------------------------------------------
+    # Start polling
+    # -----------------------------------------------------
 
     await app.initialize()
 
@@ -164,13 +159,14 @@ async def main():
 
     try:
 
+        # Keep bot running
         await asyncio.Event().wait()
 
     finally:
 
-        print(
-            "🛑 Stopping Bot..."
-        )
+        # -------------------------------------------------
+        # Graceful shutdown
+        # -------------------------------------------------
 
         await app.updater.stop()
 
@@ -179,9 +175,9 @@ async def main():
         await app.shutdown()
 
 
-# =========================
-# RUN BOT
-# =========================
+# =========================================================
+# RUN
+# =========================================================
 
 if __name__ == "__main__":
 
@@ -194,5 +190,15 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
 
         print(
-            "\n🛑 Bot Stopped"
+            "\n🛑 Bot stopped by user."
+        )
+
+    except Exception as e:
+
+        print(
+            "\n❌ Bot stopped because of an error:"
+        )
+
+        print(
+            str(e)
         )
