@@ -1,14 +1,12 @@
 import asyncio
 import logging
 
-from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
-    ContextTypes,
-    filters,
+    filters
 )
 
 from config import BOT_TOKEN
@@ -20,10 +18,6 @@ from handlers.upload import upload_file
 from handlers.callback import handle_callback
 
 
-# =========================================================
-# LOGGING
-# =========================================================
-
 logging.basicConfig(
     format=(
         "%(asctime)s - "
@@ -31,43 +25,27 @@ logging.basicConfig(
         "%(levelname)s - "
         "%(message)s"
     ),
-    level=logging.INFO,
+    level=logging.INFO
 )
 
-logger = logging.getLogger(__name__)
-
-
-# =========================================================
-# ERROR HANDLER
-# =========================================================
 
 async def error_handler(
-    update: object,
-    context: ContextTypes.DEFAULT_TYPE
+    update,
+    context
 ):
 
-    logger.error(
-        "Exception while handling update:",
+    logging.error(
+        "Update error:",
         exc_info=context.error
     )
 
 
-# =========================================================
-# MAIN
-# =========================================================
-
 async def main():
 
-    # -----------------------------------------------------
     # Initialize database
-    # -----------------------------------------------------
-
     init_db()
 
-    # -----------------------------------------------------
-    # Create Telegram application
-    # -----------------------------------------------------
-
+    # Create bot
     app = (
         Application
         .builder()
@@ -75,10 +53,7 @@ async def main():
         .build()
     )
 
-    # -----------------------------------------------------
-    # COMMANDS
-    # -----------------------------------------------------
-
+    # /start
     app.add_handler(
         CommandHandler(
             "start",
@@ -86,20 +61,14 @@ async def main():
         )
     )
 
-    # -----------------------------------------------------
-    # CALLBACK BUTTONS
-    # -----------------------------------------------------
-
+    # Callback buttons
     app.add_handler(
         CallbackQueryHandler(
             handle_callback
         )
     )
 
-    # -----------------------------------------------------
-    # FILE UPLOADS
-    # -----------------------------------------------------
-
+    # Uploaded files
     app.add_handler(
         MessageHandler(
             filters.Document.ALL,
@@ -107,20 +76,13 @@ async def main():
         )
     )
 
-    # -----------------------------------------------------
-    # ERROR HANDLER
-    # -----------------------------------------------------
-
+    # Errors
     app.add_error_handler(
         error_handler
     )
 
-    # -----------------------------------------------------
-    # START BOT
-    # -----------------------------------------------------
-
     print(
-        "===================================="
+        "================================"
     )
 
     print(
@@ -128,7 +90,7 @@ async def main():
     )
 
     print(
-        "===================================="
+        "================================"
     )
 
     print(
@@ -144,12 +106,8 @@ async def main():
     )
 
     print(
-        "===================================="
+        "================================"
     )
-
-    # -----------------------------------------------------
-    # Start polling
-    # -----------------------------------------------------
 
     await app.initialize()
 
@@ -159,14 +117,9 @@ async def main():
 
     try:
 
-        # Keep bot running
         await asyncio.Event().wait()
 
     finally:
-
-        # -------------------------------------------------
-        # Graceful shutdown
-        # -------------------------------------------------
 
         await app.updater.stop()
 
@@ -174,10 +127,6 @@ async def main():
 
         await app.shutdown()
 
-
-# =========================================================
-# RUN
-# =========================================================
 
 if __name__ == "__main__":
 
@@ -190,15 +139,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
 
         print(
-            "\n🛑 Bot stopped by user."
-        )
-
-    except Exception as e:
-
-        print(
-            "\n❌ Bot stopped because of an error:"
-        )
-
-        print(
-            str(e)
+            "🛑 Bot stopped."
         )
