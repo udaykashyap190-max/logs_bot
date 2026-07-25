@@ -4,8 +4,6 @@ import threading
 import queue
 import time
 
-from winpty import PtyProcess
-
 
 UPLOAD_FOLDER = "uploads"
 LOG_FOLDER = "logs"
