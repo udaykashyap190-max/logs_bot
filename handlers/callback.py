@@ -23,11 +23,7 @@ from database import (
     get_user_files,
     user_owns_file,
     remove_user_file,
-    get_user_file_count,
-    get_total_users,
-    get_approved_users,
-    get_pending_users,
-    get_total_files
+    get_user_file_count
 )
 
 
@@ -40,7 +36,7 @@ UPLOAD_FOLDER = "uploads"
 
 def home_keyboard():
 
-    keyboard = [
+    return InlineKeyboardMarkup([
 
         [
             InlineKeyboardButton(
@@ -56,7 +52,7 @@ def home_keyboard():
 
         [
             InlineKeyboardButton(
-                "📊 My Statistics",
+                "📊 Statistics",
                 callback_data="stats"
             ),
 
@@ -66,20 +62,14 @@ def home_keyboard():
             )
         ]
 
-    ]
-
-    return InlineKeyboardMarkup(
-        keyboard
-    )
+    ])
 
 
 # =========================================================
 # FILE LIST
 # =========================================================
 
-def files_keyboard(
-    user_id
-):
+def files_keyboard(user_id):
 
     files = get_user_files(
         user_id
@@ -95,48 +85,33 @@ def files_keyboard(
             else "🔴"
         )
 
-        keyboard.append(
+        keyboard.append([
 
-            [
+            InlineKeyboardButton(
+                f"{status} {filename}",
+                callback_data=
+                f"file|{filename}"
+            )
 
-                InlineKeyboardButton(
+        ])
 
-                    f"{status} {filename}",
+    keyboard.append([
 
-                    callback_data=
-                    f"file|{filename}"
-
-                )
-
-            ]
-
+        InlineKeyboardButton(
+            "📤 Upload File",
+            callback_data="upload"
         )
 
-    keyboard.append(
+    ])
 
-        [
+    keyboard.append([
 
-            InlineKeyboardButton(
-                "📤 Upload File",
-                callback_data="upload"
-            )
+        InlineKeyboardButton(
+            "🔙 Main Menu",
+            callback_data="home"
+        )
 
-        ]
-
-    )
-
-    keyboard.append(
-
-        [
-
-            InlineKeyboardButton(
-                "🔙 Main Menu",
-                callback_data="home"
-            )
-
-        ]
-
-    )
+    ])
 
     return InlineKeyboardMarkup(
         keyboard
@@ -144,14 +119,14 @@ def files_keyboard(
 
 
 # =========================================================
-# FILE CONTROL KEYBOARD
+# FILE CONTROLS
 # =========================================================
 
 def file_control_keyboard(
     filename
 ):
 
-    keyboard = [
+    return InlineKeyboardMarkup([
 
         [
 
@@ -218,7 +193,7 @@ def file_control_keyboard(
         [
 
             InlineKeyboardButton(
-                "🗑️ Delete File",
+                "🗑️ Delete",
                 callback_data=
                 f"delete|{filename}"
             )
@@ -235,15 +210,11 @@ def file_control_keyboard(
 
         ]
 
-    ]
-
-    return InlineKeyboardMarkup(
-        keyboard
-    )
+    ])
 
 
 # =========================================================
-# FILE SCREEN
+# SHOW FILE
 # =========================================================
 
 async def show_file(
@@ -251,30 +222,29 @@ async def show_file(
     filename
 ):
 
-    if is_running(filename):
+    status = (
 
-        status = "🟢 Running"
+        "🟢 Running"
 
-    else:
+        if is_running(filename)
 
-        status = "🔴 Stopped"
+        else
 
-    text = (
+        "🔴 Stopped"
+
+    )
+
+    await query.edit_message_text(
 
         "╔════════════════════════════╗\n"
-        "        📄 <b>FILE MANAGER</b>\n"
+        "       📄 <b>FILE MANAGER</b>\n"
         "╚════════════════════════════╝\n\n"
 
         f"📄 <b>{filename}</b>\n\n"
 
         f"📊 Status: <b>{status}</b>\n\n"
 
-        "Choose an action:"
-    )
-
-    await query.edit_message_text(
-
-        text,
+        "Choose an action:",
 
         parse_mode="HTML",
 
@@ -305,20 +275,20 @@ async def handle_callback(
     if not user:
         return
 
+    await query.answer()
+
     data = query.data or ""
 
+
     # =====================================================
-    # ACCESS CHECK
+    # ACCESS
     # =====================================================
 
-    if not has_access(
-        user.id
-    ):
+    if not has_access(user.id):
 
         await query.answer(
 
-            "🚫 You don't have permission "
-            "to use this bot.",
+            "🚫 Access denied.",
 
             show_alert=True
 
@@ -326,11 +296,9 @@ async def handle_callback(
 
         return
 
-    await query.answer()
-
 
     # =====================================================
-    # SIMPLE ACTIONS
+    # HOME
     # =====================================================
 
     if data == "home":
@@ -338,7 +306,7 @@ async def handle_callback(
         await query.edit_message_text(
 
             "🏠 <b>MAIN MENU</b>\n\n"
-            "Choose an option below:",
+            "Choose an option:",
 
             parse_mode="HTML",
 
@@ -362,41 +330,35 @@ async def handle_callback(
 
         if not files:
 
-            keyboard = [
-
-                [
-
-                    InlineKeyboardButton(
-                        "📤 Upload File",
-                        callback_data="upload"
-                    )
-
-                ],
-
-                [
-
-                    InlineKeyboardButton(
-                        "🔙 Main Menu",
-                        callback_data="home"
-                    )
-
-                ]
-
-            ]
-
             await query.edit_message_text(
 
                 "📁 <b>MY FILES</b>\n\n"
-
-                "You haven't uploaded "
-                "any files yet.",
+                "You don't have any uploaded files yet.",
 
                 parse_mode="HTML",
 
                 reply_markup=
-                InlineKeyboardMarkup(
-                    keyboard
-                )
+                InlineKeyboardMarkup([
+
+                    [
+
+                        InlineKeyboardButton(
+                            "📤 Upload File",
+                            callback_data="upload"
+                        )
+
+                    ],
+
+                    [
+
+                        InlineKeyboardButton(
+                            "🔙 Main Menu",
+                            callback_data="home"
+                        )
+
+                    ]
+
+                ])
 
             )
 
@@ -405,9 +367,7 @@ async def handle_callback(
 
         await query.edit_message_text(
 
-            "╔════════════════════════════╗\n"
-            "          📁 <b>MY FILES</b>\n"
-            "╚════════════════════════════╝\n\n"
+            "📁 <b>MY FILES</b>\n\n"
 
             "🟢 Running\n"
             "🔴 Stopped\n\n"
@@ -432,7 +392,7 @@ async def handle_callback(
 
     if data == "stats":
 
-        total_files = get_user_file_count(
+        total = get_user_file_count(
             user.id
         )
 
@@ -446,58 +406,40 @@ async def handle_callback(
 
                 running += 1
 
-
-        stopped = (
-            total_files - running
-        )
-
-
-        text = (
-
-            "📊 <b>MY STATISTICS</b>\n\n"
-
-            f"📁 Total Files: <b>{total_files}</b>\n"
-
-            f"🟢 Running: <b>{running}</b>\n"
-
-            f"🔴 Stopped: <b>{stopped}</b>\n"
-
-        )
-
-
-        keyboard = [
-
-            [
-
-                InlineKeyboardButton(
-                    "📁 My Files",
-                    callback_data="my_files"
-                )
-
-            ],
-
-            [
-
-                InlineKeyboardButton(
-                    "🔙 Main Menu",
-                    callback_data="home"
-                )
-
-            ]
-
-        ]
-
+        stopped = total - running
 
         await query.edit_message_text(
 
-            text,
+            "📊 <b>MY STATISTICS</b>\n\n"
+
+            f"📁 Total Files: <b>{total}</b>\n"
+            f"🟢 Running: <b>{running}</b>\n"
+            f"🔴 Stopped: <b>{stopped}</b>",
 
             parse_mode="HTML",
 
             reply_markup=
-            InlineKeyboardMarkup(
-                keyboard
-            )
+            InlineKeyboardMarkup([
+
+                [
+
+                    InlineKeyboardButton(
+                        "📁 My Files",
+                        callback_data="my_files"
+                    )
+
+                ],
+
+                [
+
+                    InlineKeyboardButton(
+                        "🔙 Main Menu",
+                        callback_data="home"
+                    )
+
+                ]
+
+            ])
 
         )
 
@@ -510,60 +452,41 @@ async def handle_callback(
 
     if data == "help":
 
-        text = (
+        await query.edit_message_text(
 
             "ℹ️ <b>HELP</b>\n\n"
 
-            "📤 <b>Upload File</b>\n"
-            "Upload a Python file to the bot.\n\n"
+            "📤 Upload File — Upload a Python file.\n\n"
 
-            "📁 <b>My Files</b>\n"
-            "View and manage all your uploaded files.\n\n"
+            "📁 My Files — Manage your files.\n\n"
 
-            "▶️ <b>Start</b>\n"
-            "Start a file.\n\n"
+            "▶️ Start — Start a file.\n\n"
 
-            "⏹️ <b>Stop</b>\n"
-            "Stop a running file.\n\n"
+            "⏹️ Stop — Stop a file.\n\n"
 
-            "🔄 <b>Restart</b>\n"
-            "Restart a file.\n\n"
+            "🔄 Restart — Restart a file.\n\n"
 
-            "📄 <b>Logs</b>\n"
-            "View the file output.\n\n"
+            "📄 Logs — View output logs.\n\n"
 
-            "⌨️ <b>Send Input</b>\n"
-            "Send input to a running file.\n\n"
+            "⌨️ Send Input — Send input to a running file.\n\n"
 
-            "📦 <b>Install Module</b>\n"
-            "Install a Python package."
-        )
-
-
-        keyboard = [
-
-            [
-
-                InlineKeyboardButton(
-                    "🔙 Main Menu",
-                    callback_data="home"
-                )
-
-            ]
-
-        ]
-
-
-        await query.edit_message_text(
-
-            text,
+            "📦 Install Module — Install a required Python package.",
 
             parse_mode="HTML",
 
             reply_markup=
-            InlineKeyboardMarkup(
-                keyboard
-            )
+            InlineKeyboardMarkup([
+
+                [
+
+                    InlineKeyboardButton(
+                        "🔙 Main Menu",
+                        callback_data="home"
+                    )
+
+                ]
+
+            ])
 
         )
 
@@ -571,7 +494,26 @@ async def handle_callback(
 
 
     # =====================================================
-    # FILE-SPECIFIC ACTION
+    # UPLOAD
+    # =====================================================
+
+    if data == "upload":
+
+        await query.message.reply_text(
+
+            "📤 <b>UPLOAD FILE</b>\n\n"
+
+            "Send your Python <code>.py</code> file here.",
+
+            parse_mode="HTML"
+
+        )
+
+        return
+
+
+    # =====================================================
+    # FILE ACTIONS
     # =====================================================
 
     try:
@@ -587,8 +529,33 @@ async def handle_callback(
 
 
     # =====================================================
-    # OWNERSHIP CHECK
+    # FILE OWNERSHIP
     # =====================================================
+
+    if action == "file":
+
+        if not user_owns_file(
+            user.id,
+            filename
+        ):
+
+            await query.answer(
+
+                "🚫 You don't own this file.",
+
+                show_alert=True
+
+            )
+
+            return
+
+        await show_file(
+            query,
+            filename
+        )
+
+        return
+
 
     if not user_owns_file(
         user.id,
@@ -616,59 +583,87 @@ async def handle_callback(
             filename
         )
 
-        context.user_data[
-            "active_file"
-        ] = filename
+        await query.answer(
+            message,
+            show_alert=True
+        )
+
+        await show_file(
+            query,
+            filename
+        )
+
+        return
 
 
     # =====================================================
     # STOP
     # =====================================================
 
-    elif action == "stop":
+    if action == "stop":
 
         success, message = stop_process(
             filename
         )
+
+        await query.answer(
+            message,
+            show_alert=True
+        )
+
+        await show_file(
+            query,
+            filename
+        )
+
+        return
 
 
     # =====================================================
     # RESTART
     # =====================================================
 
-    elif action == "restart":
+    if action == "restart":
 
         success, message = restart_process(
             filename
         )
 
-        context.user_data[
-            "active_file"
-        ] = filename
+        await query.answer(
+            message,
+            show_alert=True
+        )
+
+        await show_file(
+            query,
+            filename
+        )
+
+        return
 
 
     # =====================================================
     # LOGS
     # =====================================================
 
-    elif action == "logs":
+    if action == "logs":
 
         logs = get_logs(
             filename
         )
 
+        if not logs:
+
+            logs = "No logs available."
 
         if len(logs) > 3900:
 
-            logs = logs[
-                -3900:
-            ]
-
+            logs = logs[-3900:]
 
         await query.message.reply_text(
 
             f"📄 <b>LOGS</b>\n\n"
-            f"📁 <b>{filename}</b>\n\n"
+            f"📁 <code>{filename}</code>\n\n"
             f"<pre>{logs}</pre>",
 
             parse_mode="HTML"
@@ -682,17 +677,16 @@ async def handle_callback(
     # CLEAR LOGS
     # =====================================================
 
-    elif action == "clear_logs":
+    if action == "clear_logs":
 
-        success = clear_logs(
+        result = clear_logs(
             filename
         )
 
-
         await query.answer(
 
-            "🧹 Logs cleared."
-            if success
+            "✅ Logs cleared."
+            if result
             else
             "❌ Failed to clear logs.",
 
@@ -704,39 +698,20 @@ async def handle_callback(
 
 
     # =====================================================
-    # SEND INPUT
+    # INPUT
     # =====================================================
 
-    elif action == "input":
-
-        if not is_running(
-            filename
-        ):
-
-            await query.answer(
-
-                "❌ File is not running.",
-
-                show_alert=True
-
-            )
-
-            return
-
+    if action == "input":
 
         context.user_data[
             "active_file"
         ] = filename
 
-
         await query.message.reply_text(
 
             f"⌨️ <b>INPUT MODE</b>\n\n"
-
-            f"📄 File: <code>{filename}</code>\n\n"
-
-            "Send your input as a normal "
-            "Telegram message.",
+            f"📄 <code>{filename}</code>\n\n"
+            "Send the input value as a message.",
 
             parse_mode="HTML"
 
@@ -749,23 +724,20 @@ async def handle_callback(
     # INSTALL MODULE
     # =====================================================
 
-    elif action == "install":
+    if action == "install":
 
         context.user_data[
             "module_install_file"
         ] = filename
 
-
         await query.message.reply_text(
 
-            "📦 <b>INSTALL PYTHON MODULE</b>\n\n"
+            "📦 <b>INSTALL MODULE</b>\n\n"
 
             "Send the Python package name.\n\n"
 
             "Example:\n"
-            "<code>requests</code>\n\n"
-
-            "Only send the package name.",
+            "<code>requests</code>",
 
             parse_mode="HTML"
 
@@ -775,31 +747,10 @@ async def handle_callback(
 
 
     # =====================================================
-    # DELETE CONFIRMATION
+    # DELETE
     # =====================================================
 
-    elif action == "delete":
-
-        keyboard = [
-
-            [
-
-                InlineKeyboardButton(
-                    "⚠️ Yes, Delete",
-                    callback_data=
-                    f"confirm_delete|{filename}"
-                ),
-
-                InlineKeyboardButton(
-                    "❌ Cancel",
-                    callback_data=
-                    f"file|{filename}"
-                )
-
-            ]
-
-        ]
-
+    if action == "delete":
 
         await query.edit_message_text(
 
@@ -807,17 +758,33 @@ async def handle_callback(
 
             f"📄 <code>{filename}</code>\n\n"
 
-            "This will remove the file from "
-            "your uploaded files.\n\n"
+            "This will stop the process and "
+            "remove the uploaded file.\n\n"
 
             "Are you sure?",
 
             parse_mode="HTML",
 
             reply_markup=
-            InlineKeyboardMarkup(
-                keyboard
-            )
+            InlineKeyboardMarkup([
+
+                [
+
+                    InlineKeyboardButton(
+                        "⚠️ Yes, Delete",
+                        callback_data=
+                        f"confirm_delete|{filename}"
+                    ),
+
+                    InlineKeyboardButton(
+                        "❌ Cancel",
+                        callback_data=
+                        f"file|{filename}"
+                    )
+
+                ]
+
+            ])
 
         )
 
@@ -828,18 +795,8 @@ async def handle_callback(
     # CONFIRM DELETE
     # =====================================================
 
-    elif action == "confirm_delete":
+    if action == "confirm_delete":
 
-        filepath = os.path.join(
-
-            UPLOAD_FOLDER,
-
-            filename
-
-        )
-
-
-        # Stop process first
         if is_running(
             filename
         ):
@@ -849,8 +806,13 @@ async def handle_callback(
             )
 
 
-        # Delete physical file
-        deleted_from_disk = False
+        filepath = os.path.join(
+
+            UPLOAD_FOLDER,
+
+            filename
+
+        )
 
 
         if os.path.exists(
@@ -863,15 +825,20 @@ async def handle_callback(
                     filepath
                 )
 
-                deleted_from_disk = True
+            except Exception as e:
 
-            except Exception:
+                await query.answer(
 
-                deleted_from_disk = False
+                    f"❌ Delete failed: {e}",
+
+                    show_alert=True
+
+                )
+
+                return
 
 
-        # Remove database ownership
-        removed_from_db = remove_user_file(
+        remove_user_file(
 
             user.id,
 
@@ -880,51 +847,21 @@ async def handle_callback(
         )
 
 
-        if removed_from_db:
+        await query.edit_message_text(
 
-            await query.edit_message_text(
+            "✅ <b>FILE DELETED</b>\n\n"
 
-                "✅ <b>FILE DELETED</b>\n\n"
+            f"📄 <code>{filename}</code>\n\n"
 
-                f"📄 <code>{filename}</code>\n\n"
+            "The file has been removed.",
 
-                "The file has been removed.",
+            parse_mode="HTML",
 
-                parse_mode="HTML",
-
-                reply_markup=
-                files_keyboard(
-                    user.id
-                )
-
+            reply_markup=
+            files_keyboard(
+                user.id
             )
 
-        else:
-
-            await query.answer(
-
-                "❌ File could not be deleted.",
-
-                show_alert=True
-
-            )
+        )
 
         return
-
-
-    else:
-
-        return
-
-
-    # =====================================================
-    # REFRESH FILE SCREEN
-    # =====================================================
-
-    await show_file(
-
-        query,
-
-        filename
-
-    )
