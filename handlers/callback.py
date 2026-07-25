@@ -1,263 +1,49 @@
-import os
-
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup
-)
-
+from telegram import Update
 from telegram.ext import ContextTypes
 
-from core.auth import has_access
+from core.auth import (
+    is_admin,
+    has_access
+)
+
+# =========================================================
+# ADMIN HANDLERS
+# =========================================================
+
+from handlers.admin import (
+    admin_panel,
+    show_pending,
+    show_approved,
+    show_blocked,
+    show_stats,
+    show_user,
+    approve_user_callback,
+    reject_user_callback,
+    block_user_callback,
+    delete_user_callback
+)
+
+
+# =========================================================
+# EXISTING USER HANDLERS
+# =========================================================
+
+# IMPORTANT:
+# These imports must match the actual function names
+# in your existing project.
 
 from core.process import (
     start_process,
     stop_process,
     restart_process,
-    is_running,
     get_logs,
-    clear_logs
-)
-
-from database import (
-    get_user_files,
-    user_owns_file,
-    remove_user_file,
-    get_user_file_count
+    clear_logs,
+    send_input
 )
 
 
-UPLOAD_FOLDER = "uploads"
-
-
 # =========================================================
-# MAIN MENU
-# =========================================================
-
-def home_keyboard():
-
-    return InlineKeyboardMarkup([
-
-        [
-            InlineKeyboardButton(
-                "📁 My Files",
-                callback_data="my_files"
-            ),
-
-            InlineKeyboardButton(
-                "📤 Upload File",
-                callback_data="upload"
-            )
-        ],
-
-        [
-            InlineKeyboardButton(
-                "📊 Statistics",
-                callback_data="stats"
-            ),
-
-            InlineKeyboardButton(
-                "ℹ️ Help",
-                callback_data="help"
-            )
-        ]
-
-    ])
-
-
-# =========================================================
-# FILE LIST
-# =========================================================
-
-def files_keyboard(user_id):
-
-    files = get_user_files(
-        user_id
-    )
-
-    keyboard = []
-
-    for filename in files:
-
-        status = (
-            "🟢"
-            if is_running(filename)
-            else "🔴"
-        )
-
-        keyboard.append([
-
-            InlineKeyboardButton(
-                f"{status} {filename}",
-                callback_data=
-                f"file|{filename}"
-            )
-
-        ])
-
-    keyboard.append([
-
-        InlineKeyboardButton(
-            "📤 Upload File",
-            callback_data="upload"
-        )
-
-    ])
-
-    keyboard.append([
-
-        InlineKeyboardButton(
-            "🔙 Main Menu",
-            callback_data="home"
-        )
-
-    ])
-
-    return InlineKeyboardMarkup(
-        keyboard
-    )
-
-
-# =========================================================
-# FILE CONTROLS
-# =========================================================
-
-def file_control_keyboard(
-    filename
-):
-
-    return InlineKeyboardMarkup([
-
-        [
-
-            InlineKeyboardButton(
-                "▶️ Start",
-                callback_data=
-                f"start|{filename}"
-            ),
-
-            InlineKeyboardButton(
-                "⏹️ Stop",
-                callback_data=
-                f"stop|{filename}"
-            )
-
-        ],
-
-        [
-
-            InlineKeyboardButton(
-                "🔄 Restart",
-                callback_data=
-                f"restart|{filename}"
-            )
-
-        ],
-
-        [
-
-            InlineKeyboardButton(
-                "📄 Logs",
-                callback_data=
-                f"logs|{filename}"
-            ),
-
-            InlineKeyboardButton(
-                "🧹 Clear Logs",
-                callback_data=
-                f"clear_logs|{filename}"
-            )
-
-        ],
-
-        [
-
-            InlineKeyboardButton(
-                "⌨️ Send Input",
-                callback_data=
-                f"input|{filename}"
-            )
-
-        ],
-
-        [
-
-            InlineKeyboardButton(
-                "📦 Install Module",
-                callback_data=
-                f"install|{filename}"
-            )
-
-        ],
-
-        [
-
-            InlineKeyboardButton(
-                "🗑️ Delete",
-                callback_data=
-                f"delete|{filename}"
-            )
-
-        ],
-
-        [
-
-            InlineKeyboardButton(
-                "🔙 My Files",
-                callback_data=
-                "my_files"
-            )
-
-        ]
-
-    ])
-
-
-# =========================================================
-# SHOW FILE
-# =========================================================
-
-async def show_file(
-    query,
-    filename
-):
-
-    status = (
-
-        "🟢 Running"
-
-        if is_running(filename)
-
-        else
-
-        "🔴 Stopped"
-
-    )
-
-    await query.edit_message_text(
-
-        "╔════════════════════════════╗\n"
-        "       📄 <b>FILE MANAGER</b>\n"
-        "╚════════════════════════════╝\n\n"
-
-        f"📄 <b>{filename}</b>\n\n"
-
-        f"📊 Status: <b>{status}</b>\n\n"
-
-        "Choose an action:",
-
-        parse_mode="HTML",
-
-        reply_markup=
-        file_control_keyboard(
-            filename
-        )
-
-    )
-
-
-# =========================================================
-# CALLBACK HANDLER
+# CALLBACK ROUTER
 # =========================================================
 
 async def handle_callback(
@@ -268,33 +54,303 @@ async def handle_callback(
     query = update.callback_query
 
     if not query:
+
         return
 
-    user = query.from_user
-
-    if not user:
-        return
 
     await query.answer()
 
-    data = query.data or ""
+
+    user_id = (
+        query.from_user.id
+    )
+
+    data = (
+        query.data
+        or ""
+    )
 
 
     # =====================================================
-    # ACCESS
+    # ADMIN ROUTES
     # =====================================================
 
-    if not has_access(user.id):
+    # Admin Panel
 
-        await query.answer(
+    if data == "admin_panel":
 
-            "🚫 Access denied.",
+        if not is_admin(
+            user_id
+        ):
 
-            show_alert=True
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
 
+            return
+
+
+        await admin_panel(
+            update,
+            context
         )
 
         return
+
+
+    # Pending Requests
+
+    if data == "admin_pending":
+
+        if not is_admin(
+            user_id
+        ):
+
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
+
+            return
+
+
+        await show_pending(
+            update,
+            context
+        )
+
+        return
+
+
+    # Approved Users
+
+    if data == "admin_approved":
+
+        if not is_admin(
+            user_id
+        ):
+
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
+
+            return
+
+
+        await show_approved(
+            update,
+            context
+        )
+
+        return
+
+
+    # Blocked Users
+
+    if data == "admin_blocked":
+
+        if not is_admin(
+            user_id
+        ):
+
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
+
+            return
+
+
+        await show_blocked(
+            update,
+            context
+        )
+
+        return
+
+
+    # Statistics
+
+    if data == "admin_stats":
+
+        if not is_admin(
+            user_id
+        ):
+
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
+
+            return
+
+
+        await show_stats(
+            update,
+            context
+        )
+
+        return
+
+
+    # User Management
+
+    if data.startswith(
+        "admin_user|"
+    ):
+
+        if not is_admin(
+            user_id
+        ):
+
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
+
+            return
+
+
+        await show_user(
+            update,
+            context
+        )
+
+        return
+
+
+    # Approve User
+
+    if data.startswith(
+        "approve|"
+    ):
+
+        if not is_admin(
+            user_id
+        ):
+
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
+
+            return
+
+
+        await approve_user_callback(
+            update,
+            context
+        )
+
+        return
+
+
+    # Reject User
+
+    if data.startswith(
+        "reject|"
+    ):
+
+        if not is_admin(
+            user_id
+        ):
+
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
+
+            return
+
+
+        await reject_user_callback(
+            update,
+            context
+        )
+
+        return
+
+
+    # Block User
+
+    if data.startswith(
+        "block|"
+    ):
+
+        if not is_admin(
+            user_id
+        ):
+
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
+
+            return
+
+
+        await block_user_callback(
+            update,
+            context
+        )
+
+        return
+
+
+    # Delete User
+
+    if data.startswith(
+        "delete_user|"
+    ):
+
+        if not is_admin(
+            user_id
+        ):
+
+            await query.answer(
+                "🚫 Admin access required.",
+                show_alert=True
+            )
+
+            return
+
+
+        await delete_user_callback(
+            update,
+            context
+        )
+
+        return
+
+
+    # =====================================================
+    # USER ACCESS CHECK
+    # =====================================================
+
+    # Admins bypass normal user access checks.
+
+    if not is_admin(
+        user_id
+    ):
+
+        if not has_access(
+            user_id
+        ):
+
+            await query.edit_message_text(
+
+                "🚫 <b>ACCESS DENIED</b>\n\n"
+
+                "Your account is not approved "
+                "to use this bot yet.",
+
+                parse_mode="HTML"
+
+            )
+
+            return
 
 
     # =====================================================
@@ -303,372 +359,246 @@ async def handle_callback(
 
     if data == "home":
 
-        await query.edit_message_text(
+        from handlers.start import (
+            show_home
+        )
 
-            "🏠 <b>MAIN MENU</b>\n\n"
-            "Choose an option:",
-
-            parse_mode="HTML",
-
-            reply_markup=
-            home_keyboard()
-
+        await show_home(
+            update,
+            context
         )
 
         return
 
 
     # =====================================================
-    # MY FILES
+    # START PROCESS
     # =====================================================
 
-    if data == "my_files":
+    if data.startswith(
+        "start|"
+    ):
 
-        files = get_user_files(
-            user.id
-        )
+        filename = data.split(
+            "|",
+            1
+        )[1]
 
-        if not files:
+
+        try:
+
+            result = await start_process(
+
+                user_id,
+
+                filename
+
+            )
+
 
             await query.edit_message_text(
 
-                "📁 <b>MY FILES</b>\n\n"
-                "You don't have any uploaded files yet.",
+                f"▶️ <b>PROCESS STARTED</b>\n\n"
 
-                parse_mode="HTML",
+                f"📄 File: "
+                f"<code>{filename}</code>\n\n"
 
-                reply_markup=
-                InlineKeyboardMarkup([
+                f"{result}",
 
-                    [
-
-                        InlineKeyboardButton(
-                            "📤 Upload File",
-                            callback_data="upload"
-                        )
-
-                    ],
-
-                    [
-
-                        InlineKeyboardButton(
-                            "🔙 Main Menu",
-                            callback_data="home"
-                        )
-
-                    ]
-
-                ])
+                parse_mode="HTML"
 
             )
 
-            return
+        except Exception as e:
 
+            await query.edit_message_text(
 
-        await query.edit_message_text(
+                "❌ <b>START FAILED</b>\n\n"
 
-            "📁 <b>MY FILES</b>\n\n"
+                f"<code>{e}</code>",
 
-            "🟢 Running\n"
-            "🔴 Stopped\n\n"
-
-            "Select a file:",
-
-            parse_mode="HTML",
-
-            reply_markup=
-            files_keyboard(
-                user.id
-            )
-
-        )
-
-        return
-
-
-    # =====================================================
-    # STATISTICS
-    # =====================================================
-
-    if data == "stats":
-
-        total = get_user_file_count(
-            user.id
-        )
-
-        running = 0
-
-        for filename in get_user_files(
-            user.id
-        ):
-
-            if is_running(filename):
-
-                running += 1
-
-        stopped = total - running
-
-        await query.edit_message_text(
-
-            "📊 <b>MY STATISTICS</b>\n\n"
-
-            f"📁 Total Files: <b>{total}</b>\n"
-            f"🟢 Running: <b>{running}</b>\n"
-            f"🔴 Stopped: <b>{stopped}</b>",
-
-            parse_mode="HTML",
-
-            reply_markup=
-            InlineKeyboardMarkup([
-
-                [
-
-                    InlineKeyboardButton(
-                        "📁 My Files",
-                        callback_data="my_files"
-                    )
-
-                ],
-
-                [
-
-                    InlineKeyboardButton(
-                        "🔙 Main Menu",
-                        callback_data="home"
-                    )
-
-                ]
-
-            ])
-
-        )
-
-        return
-
-
-    # =====================================================
-    # HELP
-    # =====================================================
-
-    if data == "help":
-
-        await query.edit_message_text(
-
-            "ℹ️ <b>HELP</b>\n\n"
-
-            "📤 Upload File — Upload a Python file.\n\n"
-
-            "📁 My Files — Manage your files.\n\n"
-
-            "▶️ Start — Start a file.\n\n"
-
-            "⏹️ Stop — Stop a file.\n\n"
-
-            "🔄 Restart — Restart a file.\n\n"
-
-            "📄 Logs — View output logs.\n\n"
-
-            "⌨️ Send Input — Send input to a running file.\n\n"
-
-            "📦 Install Module — Install a required Python package.",
-
-            parse_mode="HTML",
-
-            reply_markup=
-            InlineKeyboardMarkup([
-
-                [
-
-                    InlineKeyboardButton(
-                        "🔙 Main Menu",
-                        callback_data="home"
-                    )
-
-                ]
-
-            ])
-
-        )
-
-        return
-
-
-    # =====================================================
-    # UPLOAD
-    # =====================================================
-
-    if data == "upload":
-
-        await query.message.reply_text(
-
-            "📤 <b>UPLOAD FILE</b>\n\n"
-
-            "Send your Python <code>.py</code> file here.",
-
-            parse_mode="HTML"
-
-        )
-
-        return
-
-
-    # =====================================================
-    # FILE ACTIONS
-    # =====================================================
-
-    try:
-
-        action, filename = data.split(
-            "|",
-            1
-        )
-
-    except ValueError:
-
-        return
-
-
-    # =====================================================
-    # FILE OWNERSHIP
-    # =====================================================
-
-    if action == "file":
-
-        if not user_owns_file(
-            user.id,
-            filename
-        ):
-
-            await query.answer(
-
-                "🚫 You don't own this file.",
-
-                show_alert=True
+                parse_mode="HTML"
 
             )
 
-            return
-
-        await show_file(
-            query,
-            filename
-        )
 
         return
 
 
-    if not user_owns_file(
-        user.id,
-        filename
+    # =====================================================
+    # STOP PROCESS
+    # =====================================================
+
+    if data.startswith(
+        "stop|"
     ):
 
-        await query.answer(
+        filename = data.split(
+            "|",
+            1
+        )[1]
 
-            "🚫 You don't own this file.",
 
-            show_alert=True
+        try:
 
-        )
+            result = await stop_process(
+
+                user_id,
+
+                filename
+
+            )
+
+
+            await query.edit_message_text(
+
+                f"⏹️ <b>PROCESS STOPPED</b>\n\n"
+
+                f"📄 File: "
+                f"<code>{filename}</code>\n\n"
+
+                f"{result}",
+
+                parse_mode="HTML"
+
+            )
+
+        except Exception as e:
+
+            await query.edit_message_text(
+
+                "❌ <b>STOP FAILED</b>\n\n"
+
+                f"<code>{e}</code>",
+
+                parse_mode="HTML"
+
+            )
+
 
         return
 
 
     # =====================================================
-    # START
+    # RESTART PROCESS
     # =====================================================
 
-    if action == "start":
+    if data.startswith(
+        "restart|"
+    ):
 
-        success, message = start_process(
-            filename
-        )
+        filename = data.split(
+            "|",
+            1
+        )[1]
 
-        await query.answer(
-            message,
-            show_alert=True
-        )
 
-        await show_file(
-            query,
-            filename
-        )
+        try:
+
+            result = await restart_process(
+
+                user_id,
+
+                filename
+
+            )
+
+
+            await query.edit_message_text(
+
+                f"🔄 <b>PROCESS RESTARTED</b>\n\n"
+
+                f"📄 File: "
+                f"<code>{filename}</code>\n\n"
+
+                f"{result}",
+
+                parse_mode="HTML"
+
+            )
+
+        except Exception as e:
+
+            await query.edit_message_text(
+
+                "❌ <b>RESTART FAILED</b>\n\n"
+
+                f"<code>{e}</code>",
+
+                parse_mode="HTML"
+
+            )
+
 
         return
 
 
     # =====================================================
-    # STOP
+    # SHOW LOGS
     # =====================================================
 
-    if action == "stop":
+    if data.startswith(
+        "logs|"
+    ):
 
-        success, message = stop_process(
-            filename
-        )
-
-        await query.answer(
-            message,
-            show_alert=True
-        )
-
-        await show_file(
-            query,
-            filename
-        )
-
-        return
+        filename = data.split(
+            "|",
+            1
+        )[1]
 
 
-    # =====================================================
-    # RESTART
-    # =====================================================
+        try:
 
-    if action == "restart":
+            logs = get_logs(
 
-        success, message = restart_process(
-            filename
-        )
+                user_id,
 
-        await query.answer(
-            message,
-            show_alert=True
-        )
+                filename
 
-        await show_file(
-            query,
-            filename
-        )
-
-        return
+            )
 
 
-    # =====================================================
-    # LOGS
-    # =====================================================
+            if not logs:
 
-    if action == "logs":
+                logs = (
+                    "📭 No logs available yet."
+                )
 
-        logs = get_logs(
-            filename
-        )
 
-        if not logs:
+            # Telegram message limit protection
 
-            logs = "No logs available."
+            if len(logs) > 3800:
 
-        if len(logs) > 3900:
+                logs = logs[
+                    -3800:
+                ]
 
-            logs = logs[-3900:]
 
-        await query.message.reply_text(
+            await query.edit_message_text(
 
-            f"📄 <b>LOGS</b>\n\n"
-            f"📁 <code>{filename}</code>\n\n"
-            f"<pre>{logs}</pre>",
+                "📄 <b>PROCESS LOGS</b>\n\n"
 
-            parse_mode="HTML"
+                f"📁 File: "
+                f"<code>{filename}</code>\n\n"
 
-        )
+                f"<pre>{logs}</pre>",
+
+                parse_mode="HTML"
+
+            )
+
+        except Exception as e:
+
+            await query.edit_message_text(
+
+                "❌ <b>LOG ERROR</b>\n\n"
+
+                f"<code>{e}</code>",
+
+                parse_mode="HTML"
+
+            )
+
 
         return
 
@@ -677,191 +607,57 @@ async def handle_callback(
     # CLEAR LOGS
     # =====================================================
 
-    if action == "clear_logs":
+    if data.startswith(
+        "clear_logs|"
+    ):
 
-        result = clear_logs(
-            filename
-        )
-
-        await query.answer(
-
-            "✅ Logs cleared."
-            if result
-            else
-            "❌ Failed to clear logs.",
-
-            show_alert=True
-
-        )
-
-        return
+        filename = data.split(
+            "|",
+            1
+        )[1]
 
 
-    # =====================================================
-    # INPUT
-    # =====================================================
+        try:
 
-    if action == "input":
+            clear_logs(
 
-        context.user_data[
-            "active_file"
-        ] = filename
+                user_id,
 
-        await query.message.reply_text(
-
-            f"⌨️ <b>INPUT MODE</b>\n\n"
-            f"📄 <code>{filename}</code>\n\n"
-            "Send the input value as a message.",
-
-            parse_mode="HTML"
-
-        )
-
-        return
-
-
-    # =====================================================
-    # INSTALL MODULE
-    # =====================================================
-
-    if action == "install":
-
-        context.user_data[
-            "module_install_file"
-        ] = filename
-
-        await query.message.reply_text(
-
-            "📦 <b>INSTALL MODULE</b>\n\n"
-
-            "Send the Python package name.\n\n"
-
-            "Example:\n"
-            "<code>requests</code>",
-
-            parse_mode="HTML"
-
-        )
-
-        return
-
-
-    # =====================================================
-    # DELETE
-    # =====================================================
-
-    if action == "delete":
-
-        await query.edit_message_text(
-
-            "⚠️ <b>DELETE FILE?</b>\n\n"
-
-            f"📄 <code>{filename}</code>\n\n"
-
-            "This will stop the process and "
-            "remove the uploaded file.\n\n"
-
-            "Are you sure?",
-
-            parse_mode="HTML",
-
-            reply_markup=
-            InlineKeyboardMarkup([
-
-                [
-
-                    InlineKeyboardButton(
-                        "⚠️ Yes, Delete",
-                        callback_data=
-                        f"confirm_delete|{filename}"
-                    ),
-
-                    InlineKeyboardButton(
-                        "❌ Cancel",
-                        callback_data=
-                        f"file|{filename}"
-                    )
-
-                ]
-
-            ])
-
-        )
-
-        return
-
-
-    # =====================================================
-    # CONFIRM DELETE
-    # =====================================================
-
-    if action == "confirm_delete":
-
-        if is_running(
-            filename
-        ):
-
-            stop_process(
                 filename
+
             )
 
 
-        filepath = os.path.join(
+            await query.answer(
 
-            UPLOAD_FOLDER,
+                "🧹 Logs cleared.",
 
-            filename
+                show_alert=True
 
-        )
-
-
-        if os.path.exists(
-            filepath
-        ):
-
-            try:
-
-                os.remove(
-                    filepath
-                )
-
-            except Exception as e:
-
-                await query.answer(
-
-                    f"❌ Delete failed: {e}",
-
-                    show_alert=True
-
-                )
-
-                return
-
-
-        remove_user_file(
-
-            user.id,
-
-            filename
-
-        )
-
-
-        await query.edit_message_text(
-
-            "✅ <b>FILE DELETED</b>\n\n"
-
-            f"📄 <code>{filename}</code>\n\n"
-
-            "The file has been removed.",
-
-            parse_mode="HTML",
-
-            reply_markup=
-            files_keyboard(
-                user.id
             )
 
-        )
+        except Exception as e:
+
+            await query.answer(
+
+                f"❌ Error: {e}",
+
+                show_alert=True
+
+            )
+
 
         return
+
+
+    # =====================================================
+    # UNKNOWN CALLBACK
+    # =====================================================
+
+    await query.answer(
+
+        "⚠️ This button is not available.",
+
+        show_alert=True
+
+    )
