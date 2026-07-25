@@ -1,7 +1,7 @@
 # =========================================================
 # FILE: core/process.py
-# PART 9D
-# Railway / Linux Compatible Process Manager
+# PART 9F
+# User-Specific Process Manager
 # =========================================================
 
 import os
@@ -14,7 +14,7 @@ import signal
 
 
 # =========================================================
-# FOLDERS
+# DIRECTORIES
 # =========================================================
 
 BASE_DIR = os.path.dirname(
@@ -46,52 +46,106 @@ os.makedirs(
 
 
 # =========================================================
-# RUNNING PROCESSES
+# PROCESS STORAGE
+#
+# KEY:
+# (user_id, filename)
 # =========================================================
 
 RUNNING_PROCESSES = {}
 
-
-# =========================================================
-# OUTPUT QUEUES
-# =========================================================
-
 PROCESS_OUTPUTS = {}
 
-
-# =========================================================
-# INPUT QUEUES
-# =========================================================
-
 PROCESS_INPUTS = {}
-
-
-# =========================================================
-# LOCK
-# =========================================================
 
 PROCESS_LOCK = threading.RLock()
 
 
 # =========================================================
-# LOG PATH
+# SAFE FILENAME
 # =========================================================
 
-def get_log_path(
+def safe_filename(
     filename
 ):
 
-    safe_name = os.path.basename(
+    return os.path.basename(
         filename
     )
 
-    return os.path.join(
+
+# =========================================================
+# PROCESS KEY
+# =========================================================
+
+def process_key(
+    user_id,
+    filename
+):
+
+    return (
+
+        int(user_id),
+
+        safe_filename(
+            filename
+        )
+
+    )
+
+
+# =========================================================
+# USER UPLOAD DIRECTORY
+# =========================================================
+
+def get_user_upload_folder(
+    user_id
+):
+
+    folder = os.path.join(
+
+        UPLOAD_FOLDER,
+
+        str(user_id)
+
+    )
+
+    os.makedirs(
+
+        folder,
+
+        exist_ok=True
+
+    )
+
+    return folder
+
+
+# =========================================================
+# USER LOG DIRECTORY
+# =========================================================
+
+def get_user_log_folder(
+    user_id
+):
+
+    folder = os.path.join(
 
         LOG_FOLDER,
 
-        safe_name + ".log"
+        str(user_id)
 
     )
+
+    os.makedirs(
+
+        folder,
+
+        exist_ok=True
+
+    )
+
+    return folder
 
 
 # =========================================================
@@ -99,22 +153,41 @@ def get_log_path(
 # =========================================================
 
 def get_file_path(
+    user_id,
     filename
 ):
 
-    safe_name = os.path.basename(
-        filename
+    return os.path.join(
+
+        get_user_upload_folder(
+            user_id
+        ),
+
+        safe_filename(
+            filename
+        )
+
     )
 
-    return os.path.abspath(
 
-        os.path.join(
+# =========================================================
+# LOG PATH
+# =========================================================
 
-            UPLOAD_FOLDER,
+def get_log_path(
+    user_id,
+    filename
+):
 
-            safe_name
+    return os.path.join(
 
-        )
+        get_user_log_folder(
+            user_id
+        ),
+
+        safe_filename(
+            filename
+        ) + ".log"
 
     )
 
@@ -124,19 +197,25 @@ def get_file_path(
 # =========================================================
 
 def write_log(
+    user_id,
     filename,
     text
 ):
 
-    logpath = get_log_path(
+    path = get_log_path(
+
+        user_id,
+
         filename
+
     )
+
 
     try:
 
         with open(
 
-            logpath,
+            path,
 
             "a",
 
@@ -147,7 +226,9 @@ def write_log(
         ) as log:
 
             log.write(
+
                 text
+
             )
 
             log.flush()
@@ -166,24 +247,33 @@ def write_log(
 # =========================================================
 
 def start_process(
+    user_id,
     filename
 ):
 
-    filename = os.path.basename(
+    filename = safe_filename(
         filename
+    )
+
+    key = process_key(
+
+        user_id,
+
+        filename
+
     )
 
 
     # -----------------------------------------------------
-    # CHECK EXISTING PROCESS
+    # CHECK ALREADY RUNNING
     # -----------------------------------------------------
 
     with PROCESS_LOCK:
 
-        if filename in RUNNING_PROCESSES:
+        if key in RUNNING_PROCESSES:
 
             existing = RUNNING_PROCESSES[
-                filename
+                key
             ]
 
             process = existing.get(
@@ -191,21 +281,31 @@ def start_process(
             )
 
 
-            if process is not None:
+            if (
 
-                if process.poll() is None:
+                process is not None
 
-                    return (
+                and
 
-                        False,
+                process.poll() is None
 
-                        "⚠️ This file is already running."
+            ):
 
-                    )
+                return (
+
+                    False,
+
+                    "⚠️ This file is already running."
+
+                )
 
 
             cleanup_process(
+
+                user_id,
+
                 filename
+
             )
 
 
@@ -214,7 +314,11 @@ def start_process(
     # -----------------------------------------------------
 
     filepath = get_file_path(
+
+        user_id,
+
         filename
+
     )
 
 
@@ -232,7 +336,7 @@ def start_process(
 
 
     # -----------------------------------------------------
-    # ONLY PYTHON FILES
+    # PYTHON FILE CHECK
     # -----------------------------------------------------
 
     if not filename.lower().endswith(
@@ -249,25 +353,19 @@ def start_process(
 
 
     # -----------------------------------------------------
-    # LOG PATH
-    # -----------------------------------------------------
-
-    logpath = get_log_path(
-        filename
-    )
-
-
-    # -----------------------------------------------------
-    # START LOG
+    # LOG
     # -----------------------------------------------------
 
     write_log(
+
+        user_id,
 
         filename,
 
         "\n\n"
         "========================================\n"
         f"STARTING FILE: {filename}\n"
+        f"USER ID: {user_id}\n"
         f"TIME: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         "========================================\n"
 
@@ -275,7 +373,7 @@ def start_process(
 
 
     # =====================================================
-    # WINDOWS / LINUX CREATION FLAGS
+    # CREATION FLAGS
     # =====================================================
 
     creationflags = 0
@@ -284,12 +382,14 @@ def start_process(
     if os.name == "nt":
 
         creationflags = (
+
             subprocess.CREATE_NEW_PROCESS_GROUP
+
         )
 
 
     # =====================================================
-    # START SUBPROCESS
+    # START PYTHON PROCESS
     # =====================================================
 
     try:
@@ -306,8 +406,8 @@ def start_process(
 
             ],
 
-            cwd=os.path.dirname(
-                filepath
+            cwd=get_user_upload_folder(
+                user_id
             ),
 
             stdin=subprocess.PIPE,
@@ -331,6 +431,8 @@ def start_process(
 
         write_log(
 
+            user_id,
+
             filename,
 
             "\n❌ FAILED TO START PROCESS\n"
@@ -350,16 +452,16 @@ def start_process(
 
 
     # =====================================================
-    # CREATE QUEUES
+    # QUEUES
     # =====================================================
 
     PROCESS_OUTPUTS[
-        filename
+        key
     ] = queue.Queue()
 
 
     PROCESS_INPUTS[
-        filename
+        key
     ] = queue.Queue()
 
 
@@ -370,23 +472,20 @@ def start_process(
     with PROCESS_LOCK:
 
         RUNNING_PROCESSES[
-            filename
+            key
         ] = {
 
             "process":
             process,
 
-            "logpath":
-            logpath,
-
-            "last_output":
-            "",
+            "started_at":
+            time.time(),
 
             "waiting_for_input":
             False,
 
-            "started_at":
-            time.time()
+            "last_output":
+            ""
 
         }
 
@@ -395,39 +494,14 @@ def start_process(
     # OUTPUT THREAD
     # =====================================================
 
-    output_thread = threading.Thread(
+    threading.Thread(
 
         target=
         read_process_output,
 
         args=(
 
-            filename,
-
-            process,
-
-            logpath
-
-        ),
-
-        daemon=True
-
-    )
-
-
-    output_thread.start()
-
-
-    # =====================================================
-    # INPUT THREAD
-    # =====================================================
-
-    input_thread = threading.Thread(
-
-        target=
-        write_process_input,
-
-        args=(
+            user_id,
 
             filename,
 
@@ -437,10 +511,31 @@ def start_process(
 
         daemon=True
 
-    )
+    ).start()
 
 
-    input_thread.start()
+    # =====================================================
+    # INPUT THREAD
+    # =====================================================
+
+    threading.Thread(
+
+        target=
+        write_process_input,
+
+        args=(
+
+            user_id,
+
+            filename,
+
+            process
+
+        ),
+
+        daemon=True
+
+    ).start()
 
 
     return (
@@ -453,33 +548,34 @@ def start_process(
 
 
 # =========================================================
-# READ PROCESS OUTPUT
+# READ OUTPUT
 # =========================================================
 
 def read_process_output(
 
+    user_id,
+
     filename,
 
-    process,
-
-    logpath
+    process
 
 ):
+
+    key = process_key(
+
+        user_id,
+
+        filename
+
+    )
+
 
     try:
 
         while True:
 
-            # -------------------------------------------------
-            # READ LINE
-            # -------------------------------------------------
-
             line = process.stdout.readline()
 
-
-            # -------------------------------------------------
-            # PROCESS CLOSED
-            # -------------------------------------------------
 
             if line == "":
 
@@ -496,80 +592,56 @@ def read_process_output(
 
 
             # -------------------------------------------------
-            # CLEAN OUTPUT
-            # -------------------------------------------------
-
-            output = line
-
-
-            # -------------------------------------------------
             # SAVE LAST OUTPUT
             # -------------------------------------------------
 
-            if filename in RUNNING_PROCESSES:
+            if key in RUNNING_PROCESSES:
 
                 RUNNING_PROCESSES[
-                    filename
+                    key
                 ][
                     "last_output"
-                ] = output
+                ] = line
 
 
             # -------------------------------------------------
-            # ADD TO OUTPUT QUEUE
+            # OUTPUT QUEUE
             # -------------------------------------------------
 
-            if filename in PROCESS_OUTPUTS:
+            if key in PROCESS_OUTPUTS:
 
                 PROCESS_OUTPUTS[
-                    filename
+                    key
                 ].put(
-                    output
+
+                    line
+
                 )
 
 
             # -------------------------------------------------
-            # WRITE TO LOG
+            # LOG
             # -------------------------------------------------
 
-            try:
+            write_log(
 
-                with open(
+                user_id,
 
-                    logpath,
+                filename,
 
-                    "a",
+                line
 
-                    encoding="utf-8",
-
-                    errors="replace"
-
-                ) as log:
-
-                    log.write(
-                        output
-                    )
-
-                    log.flush()
-
-
-            except Exception:
-
-                pass
-
-
-            # -------------------------------------------------
-            # DETECT COMMON INPUT PROMPTS
-            # -------------------------------------------------
-
-            lower_output = (
-                output
-                .strip()
-                .lower()
             )
 
 
-            input_words = [
+            # -------------------------------------------------
+            # INPUT DETECTION
+            # -------------------------------------------------
+
+            output = line.strip().lower()
+
+
+            keywords = [
 
                 "enter",
 
@@ -595,8 +667,6 @@ def read_process_output(
 
                 "proxy",
 
-                "proxy url",
-
                 "choice",
 
                 "select",
@@ -614,17 +684,17 @@ def read_process_output(
 
             waiting = any(
 
-                word in lower_output
+                word in output
 
-                for word in input_words
+                for word in keywords
 
             )
 
 
-            if filename in RUNNING_PROCESSES:
+            if key in RUNNING_PROCESSES:
 
                 RUNNING_PROCESSES[
-                    filename
+                    key
                 ][
                     "waiting_for_input"
                 ] = waiting
@@ -634,9 +704,11 @@ def read_process_output(
 
         write_log(
 
+            user_id,
+
             filename,
 
-            "\n❌ OUTPUT READER ERROR:\n"
+            "\n❌ OUTPUT ERROR:\n"
 
             f"{str(e)}\n"
 
@@ -645,29 +717,26 @@ def read_process_output(
 
     finally:
 
-        # -----------------------------------------------------
-        # PROCESS EXIT CODE
-        # -----------------------------------------------------
-
         try:
 
-            return_code = process.poll()
+            exit_code = process.poll()
 
 
-            if return_code is not None:
+            write_log(
 
-                write_log(
+                user_id,
 
-                    filename,
+                filename,
 
-                    "\n\n"
-                    "========================================\n"
-                    f"PROCESS EXITED\n"
-                    f"EXIT CODE: {return_code}\n"
-                    f"TIME: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                    "========================================\n"
+                "\n\n"
+                "========================================\n"
+                "PROCESS EXITED\n"
+                f"EXIT CODE: {exit_code}\n"
+                f"TIME: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                "========================================\n"
 
-                )
+            )
+
 
         except Exception:
 
@@ -675,10 +744,12 @@ def read_process_output(
 
 
 # =========================================================
-# WRITE PROCESS INPUT
+# WRITE INPUT
 # =========================================================
 
 def write_process_input(
+
+    user_id,
 
     filename,
 
@@ -686,11 +757,16 @@ def write_process_input(
 
 ):
 
-    while True:
+    key = process_key(
 
-        # -----------------------------------------------------
-        # PROCESS STOPPED
-        # -----------------------------------------------------
+        user_id,
+
+        filename
+
+    )
+
+
+    while True:
 
         if process.poll() is not None:
 
@@ -700,7 +776,7 @@ def write_process_input(
         try:
 
             value = PROCESS_INPUTS[
-                filename
+                key
             ].get(
 
                 timeout=0.5
@@ -718,18 +794,10 @@ def write_process_input(
             break
 
 
-        # -----------------------------------------------------
-        # STOP SIGNAL
-        # -----------------------------------------------------
-
         if value is None:
 
             break
 
-
-        # -----------------------------------------------------
-        # WRITE INPUT
-        # -----------------------------------------------------
 
         try:
 
@@ -746,10 +814,10 @@ def write_process_input(
                 process.stdin.flush()
 
 
-            if filename in RUNNING_PROCESSES:
+            if key in RUNNING_PROCESSES:
 
                 RUNNING_PROCESSES[
-                    filename
+                    key
                 ][
                     "waiting_for_input"
                 ] = False
@@ -758,6 +826,8 @@ def write_process_input(
         except Exception as e:
 
             write_log(
+
+                user_id,
 
                 filename,
 
@@ -776,18 +846,24 @@ def write_process_input(
 
 def send_input(
 
+    user_id,
+
     filename,
 
     value
 
 ):
 
-    filename = os.path.basename(
+    key = process_key(
+
+        user_id,
+
         filename
+
     )
 
 
-    if filename not in RUNNING_PROCESSES:
+    if key not in RUNNING_PROCESSES:
 
         return (
 
@@ -799,7 +875,7 @@ def send_input(
 
 
     process = RUNNING_PROCESSES[
-        filename
+        key
     ][
         "process"
     ]
@@ -808,7 +884,11 @@ def send_input(
     if process.poll() is not None:
 
         cleanup_process(
+
+            user_id,
+
             filename
+
         )
 
 
@@ -824,7 +904,7 @@ def send_input(
     try:
 
         PROCESS_INPUTS[
-            filename
+            key
         ].put(
 
             value
@@ -853,62 +933,31 @@ def send_input(
 
 
 # =========================================================
-# GET OUTPUT
-# =========================================================
-
-def get_output(
-
-    filename
-
-):
-
-    if filename not in PROCESS_OUTPUTS:
-
-        return ""
-
-
-    result = []
-
-
-    try:
-
-        while True:
-
-            result.append(
-
-                PROCESS_OUTPUTS[
-                    filename
-                ].get_nowait()
-
-            )
-
-
-    except queue.Empty:
-
-        pass
-
-
-    return "".join(
-        result
-    )
-
-
-# =========================================================
 # STOP PROCESS
 # =========================================================
 
 def stop_process(
 
+    user_id,
+
     filename
 
 ):
 
-    filename = os.path.basename(
+    filename = safe_filename(
         filename
     )
 
+    key = process_key(
 
-    if filename not in RUNNING_PROCESSES:
+        user_id,
+
+        filename
+
+    )
+
+
+    if key not in RUNNING_PROCESSES:
 
         return (
 
@@ -920,7 +969,7 @@ def stop_process(
 
 
     process = RUNNING_PROCESSES[
-        filename
+        key
     ][
         "process"
     ]
@@ -930,16 +979,14 @@ def stop_process(
 
         if process.poll() is None:
 
-            # -------------------------------------------------
-            # WINDOWS
-            # -------------------------------------------------
-
             if os.name == "nt":
 
                 try:
 
                     process.send_signal(
+
                         signal.CTRL_BREAK_EVENT
+
                     )
 
                     time.sleep(
@@ -951,23 +998,17 @@ def stop_process(
                     pass
 
 
-            # -------------------------------------------------
-            # NORMAL TERMINATE
-            # -------------------------------------------------
-
             if process.poll() is None:
 
                 process.terminate()
 
 
-            # -------------------------------------------------
-            # WAIT
-            # -------------------------------------------------
-
             try:
 
                 process.wait(
+
                     timeout=3
+
                 )
 
             except subprocess.TimeoutExpired:
@@ -975,14 +1016,9 @@ def stop_process(
                 process.kill()
 
 
-        cleanup_process(
-
-            filename
-
-        )
-
-
         write_log(
+
+            user_id,
 
             filename,
 
@@ -991,6 +1027,15 @@ def stop_process(
             "PROCESS STOPPED BY USER\n"
             f"TIME: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
             "========================================\n"
+
+        )
+
+
+        cleanup_process(
+
+            user_id,
+
+            filename
 
         )
 
@@ -1021,58 +1066,63 @@ def stop_process(
 
 def restart_process(
 
+    user_id,
+
     filename
 
 ):
 
-    filename = os.path.basename(
+    stop_process(
+
+        user_id,
+
         filename
+
     )
 
 
-    if filename in RUNNING_PROCESSES:
-
-        stop_process(
-
-            filename
-
-        )
-
-
-        time.sleep(
-            0.3
-        )
+    time.sleep(
+        0.3
+    )
 
 
     return start_process(
 
+        user_id,
+
         filename
 
     )
 
 
 # =========================================================
-# CHECK RUNNING
+# IS RUNNING
 # =========================================================
 
 def is_running(
+
+    user_id,
 
     filename
 
 ):
 
-    filename = os.path.basename(
+    key = process_key(
+
+        user_id,
+
         filename
+
     )
 
 
-    if filename not in RUNNING_PROCESSES:
+    if key not in RUNNING_PROCESSES:
 
         return False
 
 
     process = RUNNING_PROCESSES[
-        filename
+        key
     ][
         "process"
     ]
@@ -1085,6 +1135,8 @@ def is_running(
 
     cleanup_process(
 
+        user_id,
+
         filename
 
     )
@@ -1094,27 +1146,33 @@ def is_running(
 
 
 # =========================================================
-# CHECK INPUT WAITING
+# WAITING FOR INPUT
 # =========================================================
 
 def is_waiting_for_input(
+
+    user_id,
 
     filename
 
 ):
 
-    filename = os.path.basename(
+    key = process_key(
+
+        user_id,
+
         filename
+
     )
 
 
-    if filename not in RUNNING_PROCESSES:
+    if key not in RUNNING_PROCESSES:
 
         return False
 
 
     return RUNNING_PROCESSES[
-        filename
+        key
     ].get(
 
         "waiting_for_input",
@@ -1125,71 +1183,12 @@ def is_waiting_for_input(
 
 
 # =========================================================
-# CLEANUP PROCESS
-# =========================================================
-
-def cleanup_process(
-
-    filename
-
-):
-
-    filename = os.path.basename(
-        filename
-    )
-
-
-    with PROCESS_LOCK:
-
-        if filename in RUNNING_PROCESSES:
-
-            try:
-
-                process = RUNNING_PROCESSES[
-                    filename
-                ][
-                    "process"
-                ]
-
-
-                if process.poll() is None:
-
-                    process.terminate()
-
-
-            except Exception:
-
-                pass
-
-
-            del RUNNING_PROCESSES[
-                filename
-            ]
-
-
-        PROCESS_INPUTS.pop(
-
-            filename,
-
-            None
-
-        )
-
-
-        PROCESS_OUTPUTS.pop(
-
-            filename,
-
-            None
-
-        )
-
-
-# =========================================================
 # GET LOGS
 # =========================================================
 
 def get_logs(
+
+    user_id,
 
     filename,
 
@@ -1197,12 +1196,9 @@ def get_logs(
 
 ):
 
-    filename = os.path.basename(
-        filename
-    )
+    path = get_log_path(
 
-
-    logpath = get_log_path(
+        user_id,
 
         filename
 
@@ -1210,15 +1206,11 @@ def get_logs(
 
 
     if not os.path.exists(
-
-        logpath
-
+        path
     ):
 
         return (
-
             "📄 No logs available yet."
-
         )
 
 
@@ -1226,7 +1218,7 @@ def get_logs(
 
         with open(
 
-            logpath,
+            path,
 
             "r",
 
@@ -1242,9 +1234,7 @@ def get_logs(
         if not content.strip():
 
             return (
-
                 "📄 Log file is empty."
-
             )
 
 
@@ -1252,7 +1242,7 @@ def get_logs(
 
             content = (
 
-                "… Showing latest logs …\n\n"
+                "… Latest logs …\n\n"
 
                 + content[
                     -max_chars:
@@ -1281,16 +1271,15 @@ def get_logs(
 
 def clear_logs(
 
+    user_id,
+
     filename
 
 ):
 
-    filename = os.path.basename(
-        filename
-    )
+    path = get_log_path(
 
-
-    logpath = get_log_path(
+        user_id,
 
         filename
 
@@ -1301,7 +1290,7 @@ def clear_logs(
 
         with open(
 
-            logpath,
+            path,
 
             "w",
 
@@ -1318,3 +1307,118 @@ def clear_logs(
     except Exception:
 
         return False
+
+
+# =========================================================
+# CLEANUP
+# =========================================================
+
+def cleanup_process(
+
+    user_id,
+
+    filename
+
+):
+
+    key = process_key(
+
+        user_id,
+
+        filename
+
+    )
+
+
+    with PROCESS_LOCK:
+
+        RUNNING_PROCESSES.pop(
+
+            key,
+
+            None
+
+        )
+
+
+        PROCESS_INPUTS.pop(
+
+            key,
+
+            None
+
+        )
+
+
+        PROCESS_OUTPUTS.pop(
+
+            key,
+
+            None
+
+        )
+
+
+# =========================================================
+# GET USER PROCESSES
+# =========================================================
+
+def get_user_processes(
+
+    user_id
+
+):
+
+    result = []
+
+
+    with PROCESS_LOCK:
+
+        for key, data in RUNNING_PROCESSES.items():
+
+            stored_user_id, filename = key
+
+
+            if stored_user_id == int(
+                user_id
+            ):
+
+                process = data.get(
+                    "process"
+                )
+
+
+                running = (
+
+                    process is not None
+
+                    and
+
+                    process.poll() is None
+
+                )
+
+
+                result.append({
+
+                    "filename":
+                    filename,
+
+                    "running":
+                    running,
+
+                    "started_at":
+                    data.get(
+                        "started_at"
+                    ),
+
+                    "waiting_for_input":
+                    data.get(
+                        "waiting_for_input",
+                        False
+                    )
+
+                })
+
+
+    return result
