@@ -4,16 +4,49 @@ from telegram import (
     InlineKeyboardMarkup
 )
 
-from telegram.ext import (
-    ContextTypes
+from telegram.ext import ContextTypes
+
+from core.auth import has_access
+from database import (
+    save_user,
+    get_user_status,
+    get_user_file_count
 )
 
-from core.auth import (
-    register_user,
-    get_status,
-    has_access,
-    is_admin
-)
+
+def main_menu_keyboard():
+
+    keyboard = [
+
+        [
+            InlineKeyboardButton(
+                "📁 My Files",
+                callback_data="my_files"
+            ),
+
+            InlineKeyboardButton(
+                "📤 Upload File",
+                callback_data="upload"
+            )
+        ],
+
+        [
+            InlineKeyboardButton(
+                "📊 My Statistics",
+                callback_data="stats"
+            ),
+
+            InlineKeyboardButton(
+                "ℹ️ Help",
+                callback_data="help"
+            )
+        ]
+
+    ]
+
+    return InlineKeyboardMarkup(
+        keyboard
+    )
 
 
 async def start(
@@ -23,118 +56,80 @@ async def start(
 
     user = update.effective_user
 
-
-    if user is None:
-
+    if not user:
         return
 
-
-    # Register user
-    register_user(
-        user
+    # Save/update user
+    save_user(
+        user_id=user.id,
+        username=user.username,
+        first_name=user.first_name
     )
 
+    # Check access
+    if not has_access(user.id):
 
-    status = get_status(
-        user.id
-    )
+        status = get_user_status(
+            user.id
+        )
 
+        if status == "pending":
 
-    # =========================
-    # ADMIN
-    # =========================
-
-    if is_admin(
-        user.id
-    ):
-
-        keyboard = [
-
-            [
-
-                InlineKeyboardButton(
-                    "👑 Admin Panel",
-                    callback_data="admin_panel"
-                )
-
-            ]
-
-        ]
-
-
-        await update.message.reply_text(
-
-            "👑 Welcome, Admin!\n\n"
-
-            "You have full access to the "
-            "file runner.",
-
-            reply_markup=
-            InlineKeyboardMarkup(
-                keyboard
+            text = (
+                "⏳ <b>ACCESS REQUEST PENDING</b>\n\n"
+                "Your access request has been sent "
+                "to the administrator.\n\n"
+                "Please wait for approval."
             )
 
+        elif status == "rejected":
+
+            text = (
+                "🚫 <b>ACCESS DENIED</b>\n\n"
+                "Your access request was rejected "
+                "by the administrator."
+            )
+
+        else:
+
+            text = (
+                "🔐 <b>ACCESS REQUIRED</b>\n\n"
+                "You don't have permission to use "
+                "this bot yet.\n\n"
+                "Please contact the administrator "
+                "for access."
+            )
+
+        await update.message.reply_text(
+            text,
+            parse_mode="HTML"
         )
 
         return
 
-
-    # =========================
-    # APPROVED USER
-    # =========================
-
-    if has_access(
+    # File count
+    file_count = get_user_file_count(
         user.id
-    ):
+    )
 
-        await update.message.reply_text(
+    # Main welcome
+    text = (
+        "╔════════════════════════════╗\n"
+        "      🤖 <b>FILE RUNNER BOT</b>\n"
+        "╚════════════════════════════╝\n\n"
 
-            "✅ Access Approved!\n\n"
+        f"👋 Welcome, <b>{user.first_name}</b>!\n\n"
 
-            "You can now use the file runner.\n\n"
+        "🚀 Upload and manage your Python files "
+        "directly from Telegram.\n\n"
 
-            "📤 Send me a Python (.py) file "
-            "to upload."
+        f"📁 Your Files: <b>{file_count}</b>\n\n"
 
-        )
+        "Choose an option below:"
+    )
 
-        return
-
-
-    # =========================
-    # PENDING
-    # =========================
-
-    if status == "pending":
-
-        await update.message.reply_text(
-
-            "⏳ Access Pending\n\n"
-
-            "Your access request has been "
-            "sent to the administrator.\n\n"
-
-            "Please wait until your request "
-            "is approved."
-
-        )
-
-        return
-
-
-    # =========================
-    # BLOCKED
-    # =========================
-
-    if status == "blocked":
-
-        await update.message.reply_text(
-
-            "🚫 Access Denied\n\n"
-
-            "You currently don't have permission "
-            "to use this bot."
-
-        )
-
-        return
+    await update.message.reply_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=main_menu_keyboard()
+    )
