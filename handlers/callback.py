@@ -21,33 +21,23 @@ from core.process import (
 
 
 # =========================
-# MAIN FILE CONTROL KEYBOARD
+# MAIN KEYBOARD
 # =========================
 
-def main_keyboard(
-    filename
-):
+def main_keyboard(filename):
 
     keyboard = [
 
         [
 
             InlineKeyboardButton(
-
                 "▶️ Start",
-
-                callback_data=
-                f"start|{filename}"
-
+                callback_data=f"start|{filename}"
             ),
 
             InlineKeyboardButton(
-
                 "⏹️ Stop",
-
-                callback_data=
-                f"stop|{filename}"
-
+                callback_data=f"stop|{filename}"
             )
 
         ],
@@ -55,12 +45,8 @@ def main_keyboard(
         [
 
             InlineKeyboardButton(
-
                 "🔄 Restart",
-
-                callback_data=
-                f"restart|{filename}"
-
+                callback_data=f"restart|{filename}"
             )
 
         ],
@@ -68,21 +54,13 @@ def main_keyboard(
         [
 
             InlineKeyboardButton(
-
                 "📄 Logs",
-
-                callback_data=
-                f"logs|{filename}"
-
+                callback_data=f"logs|{filename}"
             ),
 
             InlineKeyboardButton(
-
                 "🧹 Clear Logs",
-
-                callback_data=
-                f"clear_logs|{filename}"
-
+                callback_data=f"clear_logs|{filename}"
             )
 
         ],
@@ -90,18 +68,22 @@ def main_keyboard(
         [
 
             InlineKeyboardButton(
-
                 "⌨️ Send Input",
+                callback_data=f"input|{filename}"
+            )
 
-                callback_data=
-                f"input|{filename}"
+        ],
 
+        [
+
+            InlineKeyboardButton(
+                "📦 Install Module",
+                callback_data=f"install|{filename}"
             )
 
         ]
 
     ]
-
 
     return InlineKeyboardMarkup(
         keyboard
@@ -128,12 +110,10 @@ async def handle_callback(
 
 
     # =========================
-    # CHECK ACCESS
+    # ACCESS CHECK
     # =========================
 
-    if not has_access(
-        user.id
-    ):
+    if not has_access(user.id):
 
         await query.answer(
 
@@ -151,17 +131,14 @@ async def handle_callback(
 
 
     # =========================
-    # GET ACTION + FILENAME
+    # GET ACTION
     # =========================
 
     try:
 
         action, filename = query.data.split(
-
             "|",
-
             1
-
         )
 
     except ValueError:
@@ -176,16 +153,11 @@ async def handle_callback(
     if action == "start":
 
         success, message = start_process(
-
             filename
-
         )
 
-
         context.user_data[
-
             "active_file"
-
         ] = filename
 
 
@@ -196,9 +168,7 @@ async def handle_callback(
     elif action == "stop":
 
         success, message = stop_process(
-
             filename
-
         )
 
 
@@ -209,16 +179,11 @@ async def handle_callback(
     elif action == "restart":
 
         success, message = restart_process(
-
             filename
-
         )
 
-
         context.user_data[
-
             "active_file"
-
         ] = filename
 
 
@@ -229,11 +194,8 @@ async def handle_callback(
     elif action == "logs":
 
         logs = get_logs(
-
             filename
-
         )
-
 
         if len(logs) > 3900:
 
@@ -243,9 +205,7 @@ async def handle_callback(
         await query.message.reply_text(
 
             f"📄 Logs\n\n"
-
             f"📁 File: `{filename}`\n\n"
-
             f"```text\n"
             f"{logs}\n"
             f"```",
@@ -253,7 +213,6 @@ async def handle_callback(
             parse_mode="Markdown"
 
         )
-
 
         return
 
@@ -265,9 +224,7 @@ async def handle_callback(
     elif action == "clear_logs":
 
         success = clear_logs(
-
             filename
-
         )
 
 
@@ -291,7 +248,6 @@ async def handle_callback(
 
             )
 
-
         return
 
 
@@ -301,11 +257,7 @@ async def handle_callback(
 
     elif action == "input":
 
-        if not is_running(
-
-            filename
-
-        ):
+        if not is_running(filename):
 
             await query.answer(
 
@@ -319,34 +271,56 @@ async def handle_callback(
 
 
         context.user_data[
-
             "active_file"
-
         ] = filename
 
 
         await query.message.reply_text(
 
             f"⌨️ Input Mode Enabled\n\n"
-
             f"📄 File: `{filename}`\n\n"
-
             f"Send your input as a normal "
-            f"Telegram message.\n\n"
-
-            f"Your message will be sent "
-            f"to the running file.",
+            f"Telegram message.",
 
             parse_mode="Markdown"
 
         )
 
+        return
+
+
+    # =========================
+    # INSTALL MODULE
+    # =========================
+
+    elif action == "install":
+
+        context.user_data[
+            "module_install_file"
+        ] = filename
+
+
+        await query.message.reply_text(
+
+            "📦 <b>Install Python Module</b>\n\n"
+
+            "Send the Python package name "
+            "you want to install.\n\n"
+
+            "Example:\n"
+            "<code>requests</code>\n\n"
+
+            "You can send one package at a time.",
+
+            parse_mode="HTML"
+
+        )
 
         return
 
 
     # =========================
-    # UNKNOWN ACTION
+    # UNKNOWN
     # =========================
 
     else:
@@ -355,14 +329,10 @@ async def handle_callback(
 
 
     # =========================
-    # UPDATE STATUS
+    # STATUS
     # =========================
 
-    if is_running(
-
-        filename
-
-    ):
+    if is_running(filename):
 
         status = "🟢 Running"
 
@@ -386,9 +356,7 @@ async def handle_callback(
         parse_mode="Markdown",
 
         reply_markup=main_keyboard(
-
             filename
-
         )
 
     )
