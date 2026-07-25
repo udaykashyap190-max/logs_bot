@@ -1,0 +1,16 @@
+C:\Users\hp\AppData\Local\Python\pythoncore-3.14-64\python.exe: can't open file 'D:\\Logs Bot\\uploads\\uploads\\File_Store_bot.py': [Errno 2] No such file or directory
+C:\Users\hp\AppData\Local\Python\pythoncore-3.14-64\python.exe: can't open file 'D:\\Logs Bot\\uploads\\uploads\\File_Store_bot.py': [Errno 2] No such file or directory
+C:\Users\hp\AppData\Local\Python\pythoncore-3.14-64\python.exe: can't open file 'D:\\Logs Bot\\uploads\\uploads\\File_Store_bot.py': [Errno 2] No such file or directory
+
+
+========================================
+STARTING FILE: File_Store_bot.py
+========================================
+2026-07-25 11:03:16,715 [INFO] Premium Database initialised.
+2026-07-25 11:03:16,716 [INFO] \U0001f916 Pro File Store Bot ANXHERE777 AARMY  starting…
+2026-07-25 11:03:16,717 [INFO] Channel expiry checker started
+2026-07-25 11:03:18,771 [INFO] Bot: @FILExSTORExROBOT (File store bot)
+2026-07-25 11:09:27,923 (__init__.py:1160 MainThread) ERROR - TeleBot: "Infinity polling: polling exited"
+2026-07-25 11:09:27,923 [ERROR] Infinity polling: polling exited
+2026-07-25 11:09:27,924 (__init__.py:1162 MainThread) ERROR - TeleBot: "Break infinity polling"
+2026-07-25 11:09:27,924 [ERROR] Break infinity polling
