@@ -1,5 +1,7 @@
-import asyncio
-import logging
+# =========================================================
+# FILE: bot.py
+# PART 9E
+# =========================================================
 
 from telegram.ext import (
     Application,
@@ -9,135 +11,103 @@ from telegram.ext import (
     filters
 )
 
-from config import BOT_TOKEN
-
-from database import init_db
-
 from handlers.start import start
+
 from handlers.upload import upload_file
-from handlers.callback import handle_callback
 
+from handlers.callback import (
+    handle_callback
+)
 
-logging.basicConfig(
-    format=(
-        "%(asctime)s - "
-        "%(name)s - "
-        "%(levelname)s - "
-        "%(message)s"
-    ),
-    level=logging.INFO
+from handlers.input import (
+    handle_input
 )
 
 
-async def error_handler(
-    update,
-    context
-):
+# =========================================================
+# BUILD APPLICATION
+# =========================================================
 
-    logging.error(
-        "Update error:",
-        exc_info=context.error
+app = (
+    Application.builder()
+
+    .token(BOT_TOKEN)
+
+    .build()
+)
+
+
+# =========================================================
+# COMMAND HANDLERS
+# =========================================================
+
+app.add_handler(
+
+    CommandHandler(
+        "start",
+        start
     )
 
+)
 
-async def main():
 
-    # Initialize database
-    init_db()
+# =========================================================
+# FILE UPLOAD HANDLER
+# =========================================================
 
-    # Create bot
-    app = (
-        Application
-        .builder()
-        .token(BOT_TOKEN)
-        .build()
+app.add_handler(
+
+    MessageHandler(
+
+        filters.Document.ALL,
+
+        upload_file
+
     )
 
-    # /start
-    app.add_handler(
-        CommandHandler(
-            "start",
-            start
-        )
+)
+
+
+# =========================================================
+# CALLBACK HANDLER
+# =========================================================
+
+app.add_handler(
+
+    CallbackQueryHandler(
+
+        handle_callback
+
     )
 
-    # Callback buttons
-    app.add_handler(
-        CallbackQueryHandler(
-            handle_callback
-        )
+)
+
+
+# =========================================================
+# TEXT INPUT HANDLER
+# =========================================================
+
+app.add_handler(
+
+    MessageHandler(
+
+        filters.TEXT
+        & ~filters.COMMAND,
+
+        handle_input
+
     )
 
-    # Uploaded files
-    app.add_handler(
-        MessageHandler(
-            filters.Document.ALL,
-            upload_file
-        )
-    )
-
-    # Errors
-    app.add_error_handler(
-        error_handler
-    )
-
-    print(
-        "================================"
-    )
-
-    print(
-        "🤖 FILE RUNNER BOT"
-    )
-
-    print(
-        "================================"
-    )
-
-    print(
-        "✅ Database Initialized"
-    )
-
-    print(
-        "✅ Handlers Loaded"
-    )
-
-    print(
-        "✅ Bot Started Successfully"
-    )
-
-    print(
-        "================================"
-    )
-
-    await app.initialize()
-
-    await app.start()
-
-    await app.updater.start_polling()
-
-    try:
-
-        await asyncio.Event().wait()
-
-    finally:
-
-        await app.updater.stop()
-
-        await app.stop()
-
-        await app.shutdown()
+)
 
 
-if __name__ == "__main__":
+# =========================================================
+# START BOT
+# =========================================================
 
-    try:
+print(
+    "✅ Bot Started Successfully"
+)
 
-        asyncio.run(
-            main()
-        )
 
-    except KeyboardInterrupt:
-
-        print(
-            "🛑 Bot stopped."
-        )
+app.run_polling()
