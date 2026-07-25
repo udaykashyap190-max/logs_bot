@@ -1,16 +1,23 @@
+import subprocess
+import re
+
 from telegram import Update
 
 from telegram.ext import (
     ContextTypes
 )
 
-from core.auth import is_owner
+from core.auth import has_access
 
 from core.process import (
     send_input,
     is_running
 )
 
+
+# =========================
+# HANDLE TEXT INPUT
+# =========================
 
 async def handle_input(
     update: Update,
@@ -19,23 +26,19 @@ async def handle_input(
 
     user = update.effective_user
 
-
-    if user is None:
-
-        return
-
-
-    if not is_owner(
-        user.id
-    ):
-
-        return
-
-
     message = update.message
 
 
-    if message is None:
+    if user is None or message is None:
+
+        return
+
+
+    # =========================
+    # ACCESS CHECK
+    # =========================
+
+    if not has_access(user.id):
 
         return
 
@@ -48,8 +51,175 @@ async def handle_input(
         return
 
 
+    # =========================
+    # MODULE INSTALL MODE
+    # =========================
+
+    module_file = context.user_data.get(
+
+        "module_install_file"
+
+    )
+
+
+    if module_file:
+
+        # Only allow normal Python package names.
+        # This prevents arbitrary shell commands.
+
+        if not re.fullmatch(
+
+            r"[A-Za-z0-9_.-]+",
+
+            text.strip()
+
+        ):
+
+            await message.reply_text(
+
+                "❌ Invalid package name.\n\n"
+
+                "Please send a valid Python "
+                "package name, for example:\n"
+
+                "`requests`",
+
+                parse_mode="Markdown"
+
+            )
+
+            return
+
+
+        package = text.strip()
+
+
+        await message.reply_text(
+
+            f"📦 Installing `{package}`...\n\n"
+            f"Please wait.",
+
+            parse_mode="Markdown"
+
+        )
+
+
+        try:
+
+            result = subprocess.run(
+
+                [
+
+                    "python",
+
+                    "-m",
+
+                    "pip",
+
+                    "install",
+
+                    package
+
+                ],
+
+                capture_output=True,
+
+                text=True,
+
+                timeout=120
+
+            )
+
+
+            if result.returncode == 0:
+
+                output = result.stdout
+
+                if len(output) > 2500:
+
+                    output = output[-2500:]
+
+
+                await message.reply_text(
+
+                    f"✅ Module installed successfully!\n\n"
+
+                    f"📦 Package: `{package}`\n\n"
+
+                    f"```text\n"
+                    f"{output}\n"
+                    f"```",
+
+                    parse_mode="Markdown"
+
+                )
+
+
+            else:
+
+                error = result.stderr
+
+                if len(error) > 3000:
+
+                    error = error[-3000:]
+
+
+                await message.reply_text(
+
+                    f"❌ Failed to install `{package}`.\n\n"
+
+                    f"```text\n"
+                    f"{error}\n"
+                    f"```",
+
+                    parse_mode="Markdown"
+
+                )
+
+
+        except subprocess.TimeoutExpired:
+
+            await message.reply_text(
+
+                "⏱️ Installation timed out.\n\n"
+                "The package may be too large "
+                "or unavailable."
+
+            )
+
+
+        except Exception as e:
+
+            await message.reply_text(
+
+                f"❌ Installation error:\n\n"
+                f"{e}"
+
+            )
+
+
+        # Clear install mode
+
+        context.user_data.pop(
+
+            "module_install_file",
+
+            None
+
+        )
+
+
+        return
+
+
+    # =========================
+    # NORMAL PROCESS INPUT
+    # =========================
+
     filename = context.user_data.get(
+
         "active_file"
+
     )
 
 
@@ -68,9 +238,7 @@ async def handle_input(
         return
 
 
-    if not is_running(
-        filename
-    ):
+    if not is_running(filename):
 
         await message.reply_text(
 
@@ -82,6 +250,10 @@ async def handle_input(
 
         return
 
+
+    # =========================
+    # SEND INPUT
+    # =========================
 
     success, result = send_input(
 
