@@ -1,7 +1,6 @@
 # =========================================================
 # FILE: handlers/upload.py
-# PART 9G
-# User-Specific Python File Upload
+# PART 9H
 # =========================================================
 
 import os
@@ -21,9 +20,14 @@ from core.process import (
     get_user_upload_folder
 )
 
+from database import (
+    add_file_owner,
+    create_process_record
+)
+
 
 # =========================================================
-# HANDLE FILE UPLOAD
+# UPLOAD FILE
 # =========================================================
 
 async def upload_file(
@@ -48,16 +52,12 @@ async def upload_file(
 
 
     # =====================================================
-    # ACCESS CHECK
+    # ACCESS
     # =====================================================
 
-    if not is_admin(
-        user_id
-    ):
+    if not is_admin(user_id):
 
-        if not has_access(
-            user_id
-        ):
+        if not has_access(user_id):
 
             await message.reply_text(
 
@@ -70,20 +70,16 @@ async def upload_file(
 
 
     # =====================================================
-    # CHECK DOCUMENT
+    # DOCUMENT
     # =====================================================
-
-    if not message.document:
-
-        return
-
 
     document = message.document
 
 
-    # =====================================================
-    # FILE NAME
-    # =====================================================
+    if not document:
+
+        return
+
 
     filename = document.file_name
 
@@ -99,20 +95,29 @@ async def upload_file(
         return
 
 
+    filename = os.path.basename(
+
+        filename
+
+    )
+
+
     # =====================================================
-    # PYTHON FILE ONLY
+    # PYTHON CHECK
     # =====================================================
 
     if not filename.lower().endswith(
+
         ".py"
+
     ):
 
         await message.reply_text(
 
             "❌ <b>Invalid File</b>\n\n"
 
-            "Only Python <code>.py</code> files "
-            "are supported.",
+            "Only Python <code>.py</code> "
+            "files are supported.",
 
             parse_mode="HTML"
 
@@ -122,10 +127,10 @@ async def upload_file(
 
 
     # =====================================================
-    # USER UPLOAD DIRECTORY
+    # USER FOLDER
     # =====================================================
 
-    upload_folder = get_user_upload_folder(
+    folder = get_user_upload_folder(
 
         user_id
 
@@ -134,17 +139,15 @@ async def upload_file(
 
     filepath = os.path.join(
 
-        upload_folder,
+        folder,
 
-        os.path.basename(
-            filename
-        )
+        filename
 
     )
 
 
     # =====================================================
-    # DOWNLOAD FILE
+    # DOWNLOAD
     # =====================================================
 
     try:
@@ -179,6 +182,28 @@ async def upload_file(
 
 
     # =====================================================
+    # DATABASE REGISTRATION
+    # =====================================================
+
+    add_file_owner(
+
+        user_id,
+
+        filename
+
+    )
+
+
+    create_process_record(
+
+        user_id,
+
+        filename
+
+    )
+
+
+    # =====================================================
     # SUCCESS
     # =====================================================
 
@@ -186,7 +211,7 @@ async def upload_file(
 
         "✅ <b>File Uploaded Successfully</b>\n\n"
 
-        f"📄 File: "
+        f"📄 <b>File:</b> "
         f"<code>{filename}</code>\n\n"
 
         "📂 Open <b>My Files</b> to manage it.",
