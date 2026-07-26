@@ -1,3 +1,9 @@
+# =========================================================
+# FILE: handlers/upload.py
+# PART 9G
+# User-Specific Python File Upload
+# =========================================================
+
 import os
 
 from telegram import Update
@@ -6,106 +12,185 @@ from telegram.ext import (
     ContextTypes
 )
 
-from core.auth import has_access
+from core.auth import (
+    has_access,
+    is_admin
+)
 
-from database import add_file_owner
+from core.process import (
+    get_user_upload_folder
+)
 
 
-UPLOAD_FOLDER = "uploads"
-
+# =========================================================
+# HANDLE FILE UPLOAD
+# =========================================================
 
 async def upload_file(
+
     update: Update,
+
     context: ContextTypes.DEFAULT_TYPE
+
 ):
 
     user = update.effective_user
 
-    if not user:
-        return
+    message = update.message
 
-    if not has_access(user.id):
 
-        await update.message.reply_text(
-            "🚫 You don't have permission "
-            "to upload files."
-        )
+    if not user or not message:
 
         return
 
-    document = update.message.document
 
-    if not document:
+    user_id = user.id
+
+
+    # =====================================================
+    # ACCESS CHECK
+    # =====================================================
+
+    if not is_admin(
+        user_id
+    ):
+
+        if not has_access(
+            user_id
+        ):
+
+            await message.reply_text(
+
+                "🚫 You don't have permission "
+                "to use this bot."
+
+            )
+
+            return
+
+
+    # =====================================================
+    # CHECK DOCUMENT
+    # =====================================================
+
+    if not message.document:
 
         return
+
+
+    document = message.document
+
+
+    # =====================================================
+    # FILE NAME
+    # =====================================================
 
     filename = document.file_name
 
+
     if not filename:
 
-        await update.message.reply_text(
-            "❌ Invalid filename."
+        await message.reply_text(
+
+            "❌ Could not detect file name."
+
         )
 
         return
 
-    # Only Python files
-    if not filename.lower().endswith(".py"):
 
-        await update.message.reply_text(
-            "❌ Only Python (.py) files "
-            "are allowed."
+    # =====================================================
+    # PYTHON FILE ONLY
+    # =====================================================
+
+    if not filename.lower().endswith(
+        ".py"
+    ):
+
+        await message.reply_text(
+
+            "❌ <b>Invalid File</b>\n\n"
+
+            "Only Python <code>.py</code> files "
+            "are supported.",
+
+            parse_mode="HTML"
+
         )
 
         return
 
-    os.makedirs(
-        UPLOAD_FOLDER,
-        exist_ok=True
+
+    # =====================================================
+    # USER UPLOAD DIRECTORY
+    # =====================================================
+
+    upload_folder = get_user_upload_folder(
+
+        user_id
+
     )
+
 
     filepath = os.path.join(
-        UPLOAD_FOLDER,
-        filename
-    )
 
-    try:
+        upload_folder,
 
-        telegram_file = await document.get_file()
-
-        await telegram_file.download_to_drive(
-            filepath
-        )
-
-        # Save file ownership
-        add_file_owner(
-            user.id,
+        os.path.basename(
             filename
         )
 
-        await update.message.reply_text(
+    )
 
-            "✅ <b>FILE UPLOADED</b>\n\n"
 
-            f"📄 <code>{filename}</code>\n\n"
+    # =====================================================
+    # DOWNLOAD FILE
+    # =====================================================
 
-            "Your file has been saved.\n"
+    try:
 
-            "Open 📁 <b>My Files</b> "
-            "to manage it.",
+        telegram_file = await context.bot.get_file(
 
-            parse_mode="HTML"
+            document.file_id
 
         )
+
+
+        await telegram_file.download_to_drive(
+
+            filepath
+
+        )
+
 
     except Exception as e:
 
-        await update.message.reply_text(
+        await message.reply_text(
 
-            "❌ <b>UPLOAD FAILED</b>\n\n"
+            "❌ <b>Upload Failed</b>\n\n"
 
-            f"<code>{str(e)}</code>",
+            f"<code>{e}</code>",
 
             parse_mode="HTML"
 
         )
+
+        return
+
+
+    # =====================================================
+    # SUCCESS
+    # =====================================================
+
+    await message.reply_text(
+
+        "✅ <b>File Uploaded Successfully</b>\n\n"
+
+        f"📄 File: "
+        f"<code>{filename}</code>\n\n"
+
+        "📂 Open <b>My Files</b> to manage it.",
+
+        parse_mode="HTML"
+
+    )
