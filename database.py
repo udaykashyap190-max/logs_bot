@@ -1,14 +1,38 @@
+# =========================================================
+# FILE: database.py
+# PART 9H
+# Persistent Database Manager
+# =========================================================
+
+import os
 import sqlite3
 from datetime import datetime
 
 
-DATABASE = "database.db"
+# =========================================================
+# DATABASE PATH
+# =========================================================
 
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
+
+DATABASE = os.path.join(
+    BASE_DIR,
+    "database.db"
+)
+
+
+# =========================================================
+# CONNECTION
+# =========================================================
 
 def get_connection():
 
     conn = sqlite3.connect(
-        DATABASE
+        DATABASE,
+
+        timeout=30
     )
 
     conn.row_factory = sqlite3.Row
@@ -26,7 +50,11 @@ def init_database():
 
     cursor = conn.cursor()
 
+
+    # =====================================================
     # USERS
+    # =====================================================
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
 
@@ -44,7 +72,11 @@ def init_database():
         )
     """)
 
-    # FILE OWNERSHIP
+
+    # =====================================================
+    # USER FILES
+    # =====================================================
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS user_files (
 
@@ -64,6 +96,41 @@ def init_database():
         )
     """)
 
+
+    # =====================================================
+    # PROCESS METADATA
+    # =====================================================
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS file_processes (
+
+            user_id INTEGER NOT NULL,
+
+            filename TEXT NOT NULL,
+
+            status TEXT NOT NULL
+                DEFAULT 'stopped',
+
+            started_at TEXT,
+
+            stopped_at TEXT,
+
+            restart_count INTEGER NOT NULL
+                DEFAULT 0,
+
+            exit_code INTEGER,
+
+            updated_at TEXT NOT NULL,
+
+            PRIMARY KEY (
+                user_id,
+                filename
+            )
+
+        )
+    """)
+
+
     conn.commit()
 
     conn.close()
@@ -81,9 +148,7 @@ def save_user(
 
     conn = get_connection()
 
-    cursor = conn.cursor()
-
-    existing = cursor.execute(
+    existing = conn.execute(
         """
         SELECT user_id
         FROM users
@@ -94,9 +159,10 @@ def save_user(
         )
     ).fetchone()
 
+
     if existing:
 
-        cursor.execute(
+        conn.execute(
             """
             UPDATE users
 
@@ -112,9 +178,10 @@ def save_user(
             )
         )
 
+
     else:
 
-        cursor.execute(
+        conn.execute(
             """
             INSERT INTO users (
 
@@ -143,6 +210,7 @@ def save_user(
                 datetime.now().isoformat()
             )
         )
+
 
     conn.commit()
 
@@ -179,9 +247,11 @@ def get_user_status(
         user_id
     )
 
+
     if not user:
 
         return None
+
 
     return user["status"]
 
@@ -290,6 +360,17 @@ def delete_user(
 
     conn.execute(
         """
+        DELETE FROM file_processes
+        WHERE user_id = ?
+        """,
+        (
+            user_id,
+        )
+    )
+
+
+    conn.execute(
+        """
         DELETE FROM user_files
         WHERE user_id = ?
         """,
@@ -297,6 +378,7 @@ def delete_user(
             user_id,
         )
     )
+
 
     conn.execute(
         """
@@ -307,6 +389,7 @@ def delete_user(
             user_id,
         )
     )
+
 
     conn.commit()
 
@@ -349,6 +432,7 @@ def add_file_owner(
         )
     )
 
+
     conn.commit()
 
     conn.close()
@@ -377,9 +461,13 @@ def get_user_files(
 
     conn.close()
 
+
     return [
+
         row["filename"]
+
         for row in rows
+
     ]
 
 
@@ -410,6 +498,7 @@ def user_owns_file(
 
     conn.close()
 
+
     return row is not None
 
 
@@ -434,13 +523,254 @@ def remove_file_owner(
         )
     )
 
+
+    conn.execute(
+        """
+        DELETE FROM file_processes
+
+        WHERE user_id = ?
+
+        AND filename = ?
+        """,
+        (
+            user_id,
+            filename
+        )
+    )
+
+
     conn.commit()
 
     conn.close()
 
 
 # =========================================================
-# USER STATISTICS
+# PROCESS METADATA
+# =========================================================
+
+def create_process_record(
+    user_id,
+    filename
+):
+
+    now = datetime.now().isoformat()
+
+    conn = get_connection()
+
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO file_processes (
+
+            user_id,
+            filename,
+            status,
+            updated_at
+
+        )
+
+        VALUES (
+
+            ?,
+            ?,
+            'stopped',
+            ?
+
+        )
+        """,
+        (
+            user_id,
+            filename,
+            now
+        )
+    )
+
+    conn.commit()
+
+    conn.close()
+
+
+def mark_process_started(
+    user_id,
+    filename,
+    restart=False
+):
+
+    now = datetime.now().isoformat()
+
+    conn = get_connection()
+
+
+    create_process_record(
+
+        user_id,
+
+        filename
+
+    )
+
+
+    if restart:
+
+        conn.execute(
+            """
+            UPDATE file_processes
+
+            SET status = 'running',
+
+                started_at = ?,
+
+                stopped_at = NULL,
+
+                exit_code = NULL,
+
+                restart_count =
+                    restart_count + 1,
+
+                updated_at = ?
+
+            WHERE user_id = ?
+
+            AND filename = ?
+            """,
+            (
+                now,
+                now,
+                user_id,
+                filename
+            )
+        )
+
+
+    else:
+
+        conn.execute(
+            """
+            UPDATE file_processes
+
+            SET status = 'running',
+
+                started_at = ?,
+
+                stopped_at = NULL,
+
+                exit_code = NULL,
+
+                updated_at = ?
+
+            WHERE user_id = ?
+
+            AND filename = ?
+            """,
+            (
+                now,
+                now,
+                user_id,
+                filename
+            )
+        )
+
+
+    conn.commit()
+
+    conn.close()
+
+
+def mark_process_stopped(
+    user_id,
+    filename,
+    exit_code=None
+):
+
+    now = datetime.now().isoformat()
+
+    conn = get_connection()
+
+    conn.execute(
+        """
+        UPDATE file_processes
+
+        SET status = 'stopped',
+
+            stopped_at = ?,
+
+            exit_code = ?,
+
+            updated_at = ?
+
+        WHERE user_id = ?
+
+        AND filename = ?
+        """,
+        (
+            now,
+            exit_code,
+            now,
+            user_id,
+            filename
+        )
+    )
+
+    conn.commit()
+
+    conn.close()
+
+
+def get_process_record(
+    user_id,
+    filename
+):
+
+    conn = get_connection()
+
+    row = conn.execute(
+        """
+        SELECT *
+
+        FROM file_processes
+
+        WHERE user_id = ?
+
+        AND filename = ?
+        """,
+        (
+            user_id,
+            filename
+        )
+    ).fetchone()
+
+    conn.close()
+
+    return row
+
+
+def get_user_process_records(
+    user_id
+):
+
+    conn = get_connection()
+
+    rows = conn.execute(
+        """
+        SELECT *
+
+        FROM file_processes
+
+        WHERE user_id = ?
+
+        ORDER BY updated_at DESC
+        """,
+        (
+            user_id,
+        )
+    ).fetchall()
+
+    conn.close()
+
+    return rows
+
+
+# =========================================================
+# STATISTICS
 # =========================================================
 
 def get_user_file_count(
@@ -466,10 +796,6 @@ def get_user_file_count(
 
     return result[0]
 
-
-# =========================================================
-# ADMIN STATISTICS
-# =========================================================
 
 def get_total_users():
 
